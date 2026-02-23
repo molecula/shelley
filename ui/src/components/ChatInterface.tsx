@@ -1753,39 +1753,14 @@ function ChatInterface({
 
   const renderMessages = () => {
     if (messages.length === 0) {
-      const proxyURL = `https://${hostname}/`;
       return (
         <div className="empty-state">
           <div className="empty-state-content">
             <p className="text-base" style={{ marginBottom: "1rem", lineHeight: "1.6" }}>
               {t("welcomeMessage")
-                .split(/(\{hostname\}|\{docsLink\}|\{proxyLink\})/)
+                .split(/(\{hostname\})/)
                 .map((part, i) => {
                   if (part === "{hostname}") return <strong key={i}>{hostname}</strong>;
-                  if (part === "{docsLink}")
-                    return (
-                      <a
-                        key={i}
-                        href="https://exe.dev/docs/proxy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "var(--blue-text)", textDecoration: "underline" }}
-                      >
-                        docs
-                      </a>
-                    );
-                  if (part === "{proxyLink}")
-                    return (
-                      <a
-                        key={i}
-                        href={proxyURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "var(--blue-text)", textDecoration: "underline" }}
-                      >
-                        {proxyURL}
-                      </a>
-                    );
                   return part;
                 })}
             </p>
