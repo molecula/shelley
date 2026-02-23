@@ -423,7 +423,7 @@ func TestGetModelSource(t *testing.T) {
 			name:    "anthropic with gateway implicit key",
 			cfg:     &Config{Gateway: "https://gateway.example.com", AnthropicAPIKey: "implicit"},
 			modelID: "claude-opus-4.6",
-			want:    "exe.dev gateway",
+			want:    "gateway",
 		},
 		{
 			name:    "anthropic with gateway but explicit key",
@@ -441,7 +441,7 @@ func TestGetModelSource(t *testing.T) {
 			name:    "fireworks with gateway implicit key",
 			cfg:     &Config{Gateway: "https://gateway.example.com", FireworksAPIKey: "implicit"},
 			modelID: "gpt-oss-20b-fireworks",
-			want:    "exe.dev gateway",
+			want:    "gateway",
 		},
 		{
 			name:    "openai with env var only",

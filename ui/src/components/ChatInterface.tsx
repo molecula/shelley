@@ -1530,32 +1530,12 @@ function ChatInterface({
 
   const renderMessages = () => {
     if (messages.length === 0) {
-      const proxyURL = `https://${hostname}/`;
       return (
         <div className="empty-state">
           <div className="empty-state-content">
             <p className="text-base" style={{ marginBottom: "1rem", lineHeight: "1.6" }}>
               Shelley is an agent, running on <strong>{hostname}</strong>. You can ask Shelley to do
-              stuff. If you build a web site with Shelley, you can use exe.dev&apos;s proxy features
-              (see{" "}
-              <a
-                href="https://exe.dev/docs/proxy"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--blue-text)", textDecoration: "underline" }}
-              >
-                docs
-              </a>
-              ) to visit it over the web at{" "}
-              <a
-                href={proxyURL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--blue-text)", textDecoration: "underline" }}
-              >
-                {proxyURL}
-              </a>
-              .
+              stuff.
             </p>
             {models.length === 0 ? (
               <div className="add-model-hint">
