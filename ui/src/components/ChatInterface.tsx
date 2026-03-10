@@ -48,6 +48,14 @@ import TerminalPanel, { EphemeralTerminal } from "./TerminalPanel";
 import ModelPicker from "./ModelPicker";
 import SystemPromptView from "./SystemPromptView";
 
+function formatCwdForDisplay(cwd: string | null | undefined): string | null {
+  if (!cwd) return null;
+  const homeDir = window.__SHELLEY_INIT__?.home_dir;
+  if (homeDir && cwd === homeDir) return "~";
+  if (homeDir && cwd.startsWith(homeDir + "/")) return "~" + cwd.slice(homeDir.length);
+  return cwd;
+}
+
 interface ContextUsageBarProps {
   contextWindowSize: number;
   maxContextTokens: number;
@@ -1925,16 +1933,23 @@ function ChatInterface({
             <span className="status-stop-label">{cancelling ? "Cancelling..." : "Stop"}</span>
           </button>
         </div>
-        <ContextUsageBar
-          contextWindowSize={contextWindowSize}
-          maxContextTokens={
-            models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
-          }
-          conversationId={conversationId}
-          modelName={selectedModelDisplayName}
-          onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
-          agentWorking={agentWorking}
-        />
+        <div className="status-bar-right">
+          {currentConversation?.cwd && (
+            <span className="status-cwd" title={currentConversation.cwd}>
+              {formatCwdForDisplay(currentConversation.cwd)}
+            </span>
+          )}
+          <ContextUsageBar
+            contextWindowSize={contextWindowSize}
+            maxContextTokens={
+              models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
+            }
+            conversationId={conversationId}
+            modelName={selectedModelDisplayName}
+            onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
+            agentWorking={agentWorking}
+          />
+        </div>
       </div>
     ) : !conversationId ? (
       // New conversation — show model picker and cwd selector
@@ -2028,16 +2043,23 @@ function ChatInterface({
           <span className="hide-on-mobile">Ready on </span>
           {hostname}
         </span>
-        <ContextUsageBar
-          contextWindowSize={contextWindowSize}
-          maxContextTokens={
-            models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
-          }
-          conversationId={conversationId}
-          modelName={selectedModelDisplayName}
-          onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
-          agentWorking={agentWorking}
-        />
+        <div className="status-bar-right">
+          {currentConversation?.cwd && (
+            <span className="status-cwd" title={currentConversation.cwd}>
+              {formatCwdForDisplay(currentConversation.cwd)}
+            </span>
+          )}
+          <ContextUsageBar
+            contextWindowSize={contextWindowSize}
+            maxContextTokens={
+              models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
+            }
+            conversationId={conversationId}
+            modelName={selectedModelDisplayName}
+            onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
+            agentWorking={agentWorking}
+          />
+        </div>
       </div>
     );
   }
