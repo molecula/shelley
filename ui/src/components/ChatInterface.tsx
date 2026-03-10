@@ -469,6 +469,7 @@ interface ChatInterfaceProps {
   isDrawerCollapsed?: boolean;
   onToggleDrawerCollapse?: () => void;
   openDiffViewerTrigger?: number; // increment to trigger opening diff viewer
+  openDirectoryPickerTrigger?: number; // increment to trigger opening directory picker
   modelsRefreshTrigger?: number; // increment to trigger models list refresh
   onOpenModelsModal?: () => void;
   onReconnect?: () => void;
@@ -597,6 +598,7 @@ function ChatInterface({
   isDrawerCollapsed,
   onToggleDrawerCollapse,
   openDiffViewerTrigger,
+  openDirectoryPickerTrigger,
   modelsRefreshTrigger,
   onOpenModelsModal,
   onReconnect,
@@ -1523,6 +1525,13 @@ function ChatInterface({
       setShowDiffViewer(true);
     }
   }, [openDiffViewerTrigger]);
+
+  // Handle external trigger to open directory picker
+  useEffect(() => {
+    if (openDirectoryPickerTrigger && openDirectoryPickerTrigger > 0) {
+      setShowDirectoryPicker(true);
+    }
+  }, [openDirectoryPickerTrigger]);
 
   const handleCancel = async () => {
     if (!conversationId || cancelling) return;
