@@ -240,6 +240,7 @@ type Server struct {
 	notifDispatcher     *notifications.Dispatcher
 	shutdownCh          chan struct{} // Signals background routines to stop
 	listenPort          int           // TCP port the server is listening on
+	onAgentDone         func(conversationID string) // optional callback when agent finishes a turn
 }
 
 // NewServer creates a new server instance
@@ -266,6 +267,17 @@ func NewServer(database *db.DB, llmManager LLMProvider, toolSetConfig claudetool
 	s.toolSetConfig.MaxSubagentDepth = 2 // Top-level and first-level subagents can spawn subagents
 
 	return s
+}
+
+// SetOnAgentDone registers a callback that fires when any conversation's agent
+// finishes a turn. The callback receives the conversation ID.
+func (s *Server) SetOnAgentDone(fn func(conversationID string)) {
+	s.onAgentDone = fn
+}
+
+// SetSlackAPI enables the Slack tool for all conversations.
+func (s *Server) SetSlackAPI(api claudetool.SlackAPI) {
+	s.toolSetConfig.SlackAPI = api
 }
 
 // RegisterNotificationChannel adds a backend notification channel to the dispatcher.
@@ -1098,6 +1110,10 @@ func (s *Server) publishConversationState(state ConversationState) {
 		}
 		// Still set notifEvent so the SSE stream broadcasts it to the UI.
 		notifEvent = &event
+
+		if s.onAgentDone != nil {
+			go s.onAgentDone(state.ConversationID)
+		}
 	}
 
 	s.mu.Lock()
