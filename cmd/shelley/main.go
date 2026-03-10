@@ -17,6 +17,7 @@ import (
 	"shelley.exe.dev/models"
 	"shelley.exe.dev/server"
 	_ "shelley.exe.dev/server/notifications/channels" // register channel types
+	shellslack "shelley.exe.dev/slack"
 	"shelley.exe.dev/templates"
 	"shelley.exe.dev/version"
 )
@@ -117,6 +118,28 @@ func runServe(global GlobalConfig, args []string) {
 	svr.SeedNotificationChannelsFromConfig(llmConfig.NotificationChannels)
 	// Load notification channels from DB
 	svr.ReloadNotificationChannels()
+
+	// Start Slack bot if configured
+	if llmConfig.SlackBotToken != "" && llmConfig.SlackAppToken != "" {
+		slackAPI := server.NewSlackConversationAPI(svr)
+		bot, err := shellslack.NewBot(shellslack.Config{
+			BotToken: llmConfig.SlackBotToken,
+			AppToken: llmConfig.SlackAppToken,
+			Model:    llmConfig.DefaultModel,
+			Convo:    slackAPI,
+			Logger:   logger,
+		})
+		if err != nil {
+			logger.Error("Failed to create Slack bot", "error", err)
+			os.Exit(1)
+		}
+		go func() {
+			if err := bot.Run(context.Background()); err != nil {
+				logger.Error("Slack bot stopped", "error", err)
+			}
+		}()
+		logger.Info("Slack bot started")
+	}
 
 	// Resolve socket path: "none" disables the Unix socket listener
 	effectiveSocket := *socketPath
@@ -310,6 +333,8 @@ func buildLLMConfig(logger *slog.Logger, configPath, terminalURL, defaultModel s
 			DefaultModel         string           `json:"default_model"`
 			Links                []server.Link    `json:"links"`
 			NotificationChannels []map[string]any `json:"notification_channels"`
+			SlackBotToken        string           `json:"slack_bot_token"`
+			SlackAppToken        string           `json:"slack_app_token"`
 		}
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			logger.Warn("Failed to parse config file", "path", configPath, "error", err)
@@ -358,6 +383,22 @@ func buildLLMConfig(logger *slog.Logger, configPath, terminalURL, defaultModel s
 			llmCfg.NotificationChannels = cfg.NotificationChannels
 			logger.Info("Notification channels configured", "count", len(cfg.NotificationChannels))
 		}
+
+		if cfg.SlackBotToken != "" {
+			llmCfg.SlackBotToken = cfg.SlackBotToken
+		}
+		if cfg.SlackAppToken != "" {
+			llmCfg.SlackAppToken = cfg.SlackAppToken
+		}
+
+	}
+
+	// Environment variables override config file for Slack tokens
+	if v := os.Getenv("SLACK_BOT_TOKEN"); v != "" {
+		llmCfg.SlackBotToken = v
+	}
+	if v := os.Getenv("SLACK_APP_TOKEN"); v != "" {
+		llmCfg.SlackAppToken = v
 	}
 
 	return llmCfg
