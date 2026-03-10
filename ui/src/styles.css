@@ -3623,7 +3623,8 @@ svg {
   border-bottom: none;
 }
 
-.directory-picker-entry:hover {
+.directory-picker-entry:hover,
+.directory-picker-entry-selected {
   background: var(--bg-tertiary);
 }
 

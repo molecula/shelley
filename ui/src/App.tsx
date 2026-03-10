@@ -120,6 +120,7 @@ function App() {
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [diffViewerTrigger, setDiffViewerTrigger] = useState(0);
+  const [directoryPickerTrigger, setDirectoryPickerTrigger] = useState(0);
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
   const [modelsRefreshTrigger, setModelsRefreshTrigger] = useState(0);
@@ -253,6 +254,13 @@ function App() {
       if (modifierPressed && e.key === "k") {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // Cmd+Shift+D (Mac) / Ctrl+Shift+D: open directory picker
+      if (modifierPressed && e.shiftKey && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        setDirectoryPickerTrigger((prev) => prev + 1);
         return;
       }
 
@@ -705,6 +713,7 @@ function App() {
               isDrawerCollapsed={drawerCollapsed}
               onToggleDrawerCollapse={toggleDrawerCollapsed}
               openDiffViewerTrigger={diffViewerTrigger}
+              openDirectoryPickerTrigger={directoryPickerTrigger}
               modelsRefreshTrigger={modelsRefreshTrigger}
               onOpenModelsModal={() => setModelsModalOpen(true)}
               onReconnect={refreshConversations}
@@ -744,6 +753,10 @@ function App() {
           }}
           onOpenDiffViewer={() => {
             setDiffViewerTrigger((prev) => prev + 1);
+            setCommandPaletteOpen(false);
+          }}
+          onOpenDirectoryPicker={() => {
+            setDirectoryPickerTrigger((prev) => prev + 1);
             setCommandPaletteOpen(false);
           }}
           onOpenModelsModal={() => {
