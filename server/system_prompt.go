@@ -39,6 +39,7 @@ type SystemPromptData struct {
 	IsSudoAvailable  bool
 	Hostname         string // For exe.dev, the public hostname (e.g., "vmname.exe.xyz")
 	SkillsXML        string // XML block for available skills
+	AlwaysOnSkills   string // Rendered always-on skill bodies
 	UserEmail        string // The exe.dev auth email of the user, if known
 }
 
@@ -84,6 +85,40 @@ type SystemPromptOption func(*SystemPromptData)
 func WithUserEmail(email string) SystemPromptOption {
 	return func(d *SystemPromptData) {
 		d.UserEmail = email
+	}
+}
+
+// WithAlwaysOnSkills sets the list of skill names whose bodies are always
+// included in the system prompt (pre-activated).
+func WithAlwaysOnSkills(names []string) SystemPromptOption {
+	return func(d *SystemPromptData) {
+		if len(names) == 0 {
+			return
+		}
+		dirs := skills.DefaultDirs()
+		all := skills.Discover(dirs)
+		all = append(all, skills.BuiltinSkills()...)
+
+		var sb strings.Builder
+		for _, name := range names {
+			for _, s := range all {
+				if s.Name != name {
+					continue
+				}
+				body := s.Body
+				if body == "" && s.Path != "" {
+					if data, err := os.ReadFile(s.Path); err == nil {
+						body = skills.ExtractBody(string(data))
+					}
+				}
+				if body != "" {
+					sb.WriteString(body)
+					sb.WriteByte('\n')
+				}
+				break
+			}
+		}
+		d.AlwaysOnSkills = strings.TrimSpace(sb.String())
 	}
 }
 
@@ -357,10 +392,15 @@ func isExeDev() bool {
 	return err == nil
 }
 
-// collectSkills discovers skills from default directories, project .skills dirs,
-// the project tree, and built-in skills. See skills.ListAll for precedence rules.
+// collectSkills discovers skills from default directories and project skills dirs.
+// It does NOT walk the entire project tree, since that would pick up application
+// skills (e.g. in pkg/ or assets/) that are not meant for the coding agent.
 func collectSkills(workingDir, gitRoot string) string {
-	return skills.ToPromptXML(skills.ListAll(workingDir, gitRoot))
+	dirs := skills.DefaultDirs()
+	dirs = append(dirs, skills.ProjectSkillsDirs(workingDir, gitRoot)...)
+	foundSkills := skills.Discover(dirs)
+	foundSkills = append(foundSkills, skills.BuiltinSkills()...)
+	return skills.ToPromptXML(foundSkills)
 }
 
 // resolveAndNormalize returns a canonical lowercase path for dedup.

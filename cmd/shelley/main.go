@@ -104,15 +104,38 @@ func runSkill(args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: shelley skill cat SKILL_NAME\n")
 			os.Exit(1)
 		}
-		content, err := skills.FindByName(args[1], wd)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		dirs := skills.DefaultDirs()
+		dirs = append(dirs, skills.ProjectSkillsDirs(wd, "")...)
+		all := skills.Discover(dirs)
+		all = append(all, skills.BuiltinSkills()...)
+		var found bool
+		for _, s := range all {
+			if s.Name == args[1] {
+				if s.Path != "" {
+					content, err := os.ReadFile(s.Path)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+						os.Exit(1)
+					}
+					fmt.Print(string(content))
+				} else {
+					// Built-in skill: reconstruct from fields
+					fmt.Printf("---\nname: %s\ndescription: %s\n---\n\n%s\n", s.Name, s.Description, s.Body)
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			fmt.Fprintf(os.Stderr, "Error: skill %q not found\n", args[1])
 			os.Exit(1)
 		}
-		fmt.Print(content)
 
 	case "ls":
-		all := skills.ListAll(wd, "")
+		dirs := skills.DefaultDirs()
+		dirs = append(dirs, skills.ProjectSkillsDirs(wd, "")...)
+		all := skills.Discover(dirs)
+		all = append(all, skills.BuiltinSkills()...)
 		for _, s := range all {
 			fmt.Printf("%s\t%s\n", s.Name, s.Description)
 		}
@@ -166,6 +189,7 @@ func runServe(global GlobalConfig, args []string) {
 
 	// Create server
 	svr := server.NewServer(database, llmManager, toolSetConfig, logger, global.PredictableOnly, llmConfig.TerminalURL, llmConfig.DefaultModel, *requireHeader, llmConfig.Links)
+	svr.SetAlwaysOnSkills(llmConfig.AlwaysOnSkills)
 
 	// Seed notification channels from config file if DB is empty (one-time migration)
 	svr.SeedNotificationChannelsFromConfig(llmConfig.NotificationChannels)
@@ -386,13 +410,14 @@ func buildLLMConfig(logger *slog.Logger, configPath, terminalURL, defaultModel s
 		}
 
 		var cfg struct {
-			LLMGateway           string           `json:"llm_gateway"`
-			TerminalURL          string           `json:"terminal_url"`
-			DefaultModel         string           `json:"default_model"`
-			Links                []server.Link    `json:"links"`
-			NotificationChannels []map[string]any `json:"notification_channels"`
-			SlackBotToken        string           `json:"slack_bot_token"`
-			SlackAppToken        string           `json:"slack_app_token"`
+			LLMGateway           string                `json:"llm_gateway"`
+			TerminalURL          string                `json:"terminal_url"`
+			DefaultModel         string                `json:"default_model"`
+			Links                []server.Link         `json:"links"`
+			NotificationChannels []map[string]any      `json:"notification_channels"`
+			SlackBotToken        string                `json:"slack_bot_token"`
+			SlackAppToken        string                `json:"slack_app_token"`
+			AlwaysOnSkills       []string              `json:"always_on_skills"`
 		}
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			logger.Warn("Failed to parse config file", "path", configPath, "error", err)
@@ -449,6 +474,10 @@ func buildLLMConfig(logger *slog.Logger, configPath, terminalURL, defaultModel s
 			llmCfg.SlackAppToken = cfg.SlackAppToken
 		}
 
+		if len(cfg.AlwaysOnSkills) > 0 {
+			llmCfg.AlwaysOnSkills = cfg.AlwaysOnSkills
+			logger.Info("Always-on skills configured", "skills", cfg.AlwaysOnSkills)
+		}
 	}
 
 	// Environment variables override config file for Slack tokens

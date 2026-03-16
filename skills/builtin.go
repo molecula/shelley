@@ -47,7 +47,7 @@ func BuiltinSkills() []Skill {
 		}
 
 		// Extract the body (everything after the second ---)
-		body := extractBody(string(data))
+		body := ExtractBody(string(data))
 
 		out = append(out, Skill{
 			Name:        name,
@@ -60,8 +60,8 @@ func BuiltinSkills() []Skill {
 	return out
 }
 
-// extractBody returns the markdown content after the YAML frontmatter.
-func extractBody(content string) string {
+// ExtractBody returns the markdown content after the YAML frontmatter.
+func ExtractBody(content string) string {
 	parts := strings.SplitN(content, "---", 3)
 	if len(parts) < 3 {
 		return ""

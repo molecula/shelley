@@ -241,6 +241,7 @@ type Server struct {
 	shutdownCh          chan struct{} // Signals background routines to stop
 	listenPort          int           // TCP port the server is listening on
 	onAgentDone         func(conversationID string) // optional callback when agent finishes a turn
+	alwaysOnSkills      []string                    // skill names pre-activated in system prompt
 }
 
 // NewServer creates a new server instance
@@ -273,6 +274,12 @@ func NewServer(database *db.DB, llmManager LLMProvider, toolSetConfig claudetool
 // finishes a turn. The callback receives the conversation ID.
 func (s *Server) SetOnAgentDone(fn func(conversationID string)) {
 	s.onAgentDone = fn
+}
+
+// SetAlwaysOnSkills configures skill names whose bodies are always
+// included in the system prompt (pre-activated).
+func (s *Server) SetAlwaysOnSkills(names []string) {
+	s.alwaysOnSkills = names
 }
 
 // SetSlackAPI enables the Slack tool for all conversations.
@@ -714,6 +721,7 @@ func (s *Server) getOrCreateConversationManager(ctx context.Context, conversatio
 
 		manager := NewConversationManager(conversationID, s.db, s.logger, s.toolSetConfig, recordMessage, onStateChange)
 		manager.userEmail = userEmail
+		manager.alwaysOnSkills = s.alwaysOnSkills
 		if err := manager.Hydrate(ctx); err != nil {
 			return nil, err
 		}
