@@ -41,6 +41,10 @@ type LLMConfig struct {
 	SlackBotToken string
 	SlackAppToken string
 
+
+	// AlwaysOnSkills is a list of skill names whose bodies are always
+	// included in the system prompt (pre-activated).
+	AlwaysOnSkills []string
 	// DB is the database for recording LLM requests (optional)
 	DB *db.DB
 

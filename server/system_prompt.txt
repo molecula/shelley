@@ -52,4 +52,7 @@ Skills extend your capabilities. When a task matches a skill's description, acti
 {{.SkillsXML}}
 </skills>
 {{end}}
+{{if .AlwaysOnSkills}}
+{{.AlwaysOnSkills}}
+{{end}}
 

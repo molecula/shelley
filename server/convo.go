@@ -52,7 +52,8 @@ type ConversationManager struct {
 	hydrated              bool
 	hasConversationEvents bool
 	cwd                   string // working directory for tools
-	userEmail             string // exe.dev auth email, from X-ExeDev-Email header
+	userEmail             string   // exe.dev auth email, from X-ExeDev-Email header
+	alwaysOnSkills        []string // skill names pre-activated in system prompt
 
 	// agentWorking tracks whether the agent is currently working.
 	// This is explicitly managed and broadcast to subscribers when it changes.
@@ -473,6 +474,9 @@ func (cm *ConversationManager) createSystemPrompt(ctx context.Context) (*generat
 	var opts []SystemPromptOption
 	if cm.userEmail != "" {
 		opts = append(opts, WithUserEmail(cm.userEmail))
+	}
+	if len(cm.alwaysOnSkills) > 0 {
+		opts = append(opts, WithAlwaysOnSkills(cm.alwaysOnSkills))
 	}
 	systemPrompt, err := GenerateSystemPrompt(cm.cwd, opts...)
 	if err != nil {
