@@ -3,12 +3,10 @@
 package skills
 
 import (
-	"context"
 	"html"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -345,8 +343,9 @@ func expandPath(path string) string {
 	return path
 }
 
-// ProjectSkillsDirs returns all .skills directories found by walking up from
-// the working directory to the git root (or filesystem root if no git root).
+// ProjectSkillsDirs returns all .skills and .claude/skills directories found
+// by walking up from the working directory to the git root (or filesystem root
+// if no git root).
 func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 	var dirs []string
 	seen := make(map[string]bool)
@@ -360,11 +359,14 @@ func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 	// Walk up from working directory
 	current := workingDir
 	for current != "" {
-		skillsDir := filepath.Join(current, ".skills")
-		if !seen[skillsDir] {
-			if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
-				dirs = append(dirs, skillsDir)
-				seen[skillsDir] = true
+		// Check for .skills/ and .claude/skills/ in each directory
+		for _, rel := range []string{".skills", filepath.Join(".claude", "skills")} {
+			candidate := filepath.Join(current, rel)
+			if !seen[candidate] {
+				if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+					dirs = append(dirs, candidate)
+					seen[candidate] = true
+				}
 			}
 		}
 
@@ -381,70 +383,4 @@ func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 	}
 
 	return dirs
-}
-
-// DiscoverInTree finds all skills by walking the directory tree looking for SKILL.md files.
-// If gitRoot is provided, it searches from gitRoot. Otherwise, it searches from workingDir downward.
-func DiscoverInTree(workingDir, gitRoot string) []Skill {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var skills []Skill
-	seen := make(map[string]bool)
-
-	// Determine root to search from
-	searchRoot := gitRoot
-	if searchRoot == "" {
-		searchRoot = workingDir
-	}
-
-	filepath.Walk(searchRoot, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return filepath.SkipAll
-		}
-		if err != nil {
-			return nil // Continue on errors
-		}
-
-		if info.IsDir() {
-			// Skip hidden directories and common ignore patterns
-			name := info.Name()
-			if name != "." && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Check if this is a SKILL.md file
-		lowerName := strings.ToLower(info.Name())
-		if lowerName != "skill.md" {
-			return nil
-		}
-
-		// Avoid duplicates
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return nil
-		}
-		if seen[absPath] {
-			return nil
-		}
-		seen[absPath] = true
-
-		skill, err := Parse(path)
-		if err != nil {
-			return nil // Skip invalid skills
-		}
-
-		// Validate name matches parent directory
-		parentDir := filepath.Base(filepath.Dir(path))
-		if skill.Name != parentDir {
-			return nil
-		}
-
-		skills = append(skills, skill)
-		return nil
-	})
-
-	return skills
 }

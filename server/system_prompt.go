@@ -346,32 +346,18 @@ func isExeDev() bool {
 	return err == nil
 }
 
-// collectSkills discovers skills from default directories, project .skills dirs,
-// and the project tree.
+// collectSkills discovers skills from default directories and project skills dirs.
+// It does NOT walk the entire project tree, since that would pick up application
+// skills (e.g. in pkg/ or assets/) that are not meant for the coding agent.
 func collectSkills(workingDir, gitRoot string) string {
 	// Start with default directories (user-level skills)
 	dirs := skills.DefaultDirs()
 
-	// Add .skills directories found in the project tree
+	// Add .skills and .claude/skills directories found in the project tree
 	dirs = append(dirs, skills.ProjectSkillsDirs(workingDir, gitRoot)...)
 
 	// Discover skills from all directories
 	foundSkills := skills.Discover(dirs)
-
-	// Also discover skills anywhere in the project tree
-	treeSkills := skills.DiscoverInTree(workingDir, gitRoot)
-
-	// Merge, avoiding duplicates by path
-	seen := make(map[string]bool)
-	for _, s := range foundSkills {
-		seen[s.Path] = true
-	}
-	for _, s := range treeSkills {
-		if !seen[s.Path] {
-			foundSkills = append(foundSkills, s)
-			seen[s.Path] = true
-		}
-	}
 
 	// Generate XML
 	return skills.ToPromptXML(foundSkills)
