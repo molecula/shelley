@@ -97,11 +97,19 @@ body {
   overflow: hidden;
 }
 
-.main-content {
+.main-content-wrapper {
   flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.main-content {
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background: var(--bg-base);
+  overflow: hidden;
 }
 
 .screen-height {
@@ -2734,6 +2742,7 @@ svg {
   .drawer {
     position: static;
     transform: translateX(0) !important;
+    border-right: none;
   }
 
   .drawer.collapsed {
@@ -2750,6 +2759,50 @@ svg {
 
   .backdrop {
     display: none !important;
+  }
+
+  /* Desktop: content panel has constant border-radius.
+     Corner fill overlays on .main-content-wrapper toggle opacity to
+     make left corners appear square when the active drawer item is
+     at the top/bottom of the list. Since border-radius never changes
+     and opacity is compositor-only, no layout thrashing occurs. */
+  .main-content {
+    border-radius: 0.75rem;
+  }
+
+  .main-content-wrapper::before,
+  .main-content-wrapper::after {
+    content: '';
+    position: absolute;
+    width: 0.75rem;
+    height: 0.75rem;
+    left: 0;
+    background: var(--bg-base);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    will-change: opacity;
+  }
+
+  .main-content-wrapper::before {
+    top: 0;
+  }
+
+  .main-content-wrapper::after {
+    bottom: 0;
+  }
+
+  .app-container[data-section-position='first'] .main-content-wrapper::before {
+    opacity: 1;
+  }
+
+  .app-container[data-section-position='last'] .main-content-wrapper::after {
+    opacity: 1;
+  }
+
+  .app-container[data-section-position='only'] .main-content-wrapper::before,
+  .app-container[data-section-position='only'] .main-content-wrapper::after {
+    opacity: 1;
   }
 }
 

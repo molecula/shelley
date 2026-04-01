@@ -111,6 +111,7 @@ function App() {
   const [viewedConversation, setViewedConversation] = useState<Conversation | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+  const [sectionPosition, setSectionPosition] = useState<"first" | "middle" | "last" | "only" | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [diffViewerTrigger, setDiffViewerTrigger] = useState(0);
   const [directoryPickerTrigger, setDirectoryPickerTrigger] = useState(0);
@@ -611,7 +612,7 @@ function App() {
       poolOptions={diffsPoolOptions}
       highlighterOptions={diffsHighlighterOptions}
     >
-      <div className="app-container">
+      <div className="app-container" data-section-position={sectionPosition || undefined}>
         {/* Conversations drawer */}
         <ConversationDrawer
           isOpen={drawerOpen}
@@ -629,9 +630,11 @@ function App() {
           subagentUpdate={subagentUpdate}
           subagentStateUpdate={subagentStateUpdate}
           showActiveTrigger={showActiveTrigger}
+          onSectionPositionChange={setSectionPosition}
         />
 
-        {/* Main chat interface */}
+        {/* Main chat interface — wrapper provides corner fill overlays */}
+        <div className="main-content-wrapper">
         <div className="main-content">
           <ChatInterface
             conversationId={currentConversationId}
@@ -660,6 +663,7 @@ function App() {
             navigateUserMessageTrigger={navigateUserMessageTrigger}
             onConversationUnarchived={handleConversationUnarchived}
           />
+        </div>
         </div>
 
         {/* Command Palette */}

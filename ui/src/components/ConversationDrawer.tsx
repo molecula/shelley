@@ -22,6 +22,7 @@ interface ConversationDrawerProps {
   subagentUpdate?: Conversation | null; // When a subagent is created/updated
   subagentStateUpdate?: { conversation_id: string; working: boolean } | null; // When a subagent's working state changes
   showActiveTrigger?: number; // Increment to switch back to active conversations view
+  onSectionPositionChange?: (position: "first" | "middle" | "last" | "only" | null) => void;
 }
 
 function ConversationDrawer({
@@ -40,6 +41,7 @@ function ConversationDrawer({
   subagentUpdate,
   subagentStateUpdate,
   showActiveTrigger,
+  onSectionPositionChange,
 }: ConversationDrawerProps) {
   const { t } = useI18n();
   const [showArchived, setShowArchived] = useState(false);
@@ -441,6 +443,43 @@ function ConversationDrawer({
 
     return sorted;
   }, [sortedConversations, groupBy, showArchived, sortComparator, t]);
+
+  // Compute the position of the active conversation in the visible list
+  // to drive the content panel corner overlay (Option 5 technique).
+  const sectionPosition = useMemo((): "first" | "middle" | "last" | "only" | null => {
+    if (!currentConversationId) return null;
+
+    // Build the flat visible list of conversation IDs
+    let visibleIds: string[];
+    if (groupedConversations) {
+      visibleIds = [];
+      for (const [key, group] of groupedConversations) {
+        if (!collapsedGroups.has(key)) {
+          for (const conv of group.conversations) {
+            visibleIds.push(conv.conversation_id);
+          }
+        }
+      }
+    } else {
+      visibleIds = displayedConversations.map((c) => c.conversation_id);
+    }
+
+    const idx = visibleIds.indexOf(currentConversationId);
+    if (idx < 0) return null;
+    if (visibleIds.length === 1) return "only";
+    if (idx === 0) return "first";
+    if (idx === visibleIds.length - 1) return "last";
+    return "middle";
+  }, [
+    currentConversationId,
+    groupedConversations,
+    collapsedGroups,
+    displayedConversations,
+  ]);
+
+  useEffect(() => {
+    onSectionPositionChange?.(sectionPosition);
+  }, [sectionPosition, onSectionPositionChange]);
 
   const renderConversationItem = (conversation: Conversation | ConversationWithState) => {
     const convState = conversation as ConversationWithState;
