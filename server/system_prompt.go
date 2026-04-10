@@ -35,12 +35,8 @@ type SystemPromptData struct {
 	WorkingDirectory string
 	GitInfo          *GitInfo
 	Codebase         *CodebaseInfo
-	IsExeDev         bool
-	IsSudoAvailable  bool
-	Hostname         string // For exe.dev, the public hostname (e.g., "vmname.exe.xyz")
 	SkillsXML        string // XML block for available skills
 	AlwaysOnSkills   string // Rendered always-on skill bodies
-	UserEmail        string // The exe.dev auth email of the user, if known
 }
 
 // DBPath is the path to the shelley database, set at startup
@@ -81,12 +77,6 @@ func (c *CodebaseInfo) SubdirGuidanceSummary() string {
 // SystemPromptOption configures optional fields on the system prompt.
 type SystemPromptOption func(*SystemPromptData)
 
-// WithUserEmail sets the user's email in the system prompt.
-func WithUserEmail(email string) SystemPromptOption {
-	return func(d *SystemPromptData) {
-		d.UserEmail = email
-	}
-}
 
 // WithAlwaysOnSkills sets the list of skill names whose bodies are always
 // included in the system prompt (pre-activated).
@@ -184,22 +174,6 @@ func collectSystemData(workingDir string) (*SystemPromptData, error) {
 		data.Codebase = codebaseInfo
 	}
 
-	// Check if running on exe.dev
-	data.IsExeDev = isExeDev()
-
-	// Check sudo availability
-	data.IsSudoAvailable = isSudoAvailable()
-
-	// Get hostname for exe.dev
-	if data.IsExeDev {
-		if hostname, err := os.Hostname(); err == nil {
-			// If hostname doesn't contain dots, add .exe.xyz suffix
-			if !strings.Contains(hostname, ".") {
-				hostname = hostname + ".exe.xyz"
-			}
-			data.Hostname = hostname
-		}
-	}
 
 	// Discover and load skills
 	var gitRoot string
@@ -387,11 +361,6 @@ func findSubdirGuidanceFiles(root string) []string {
 	return found
 }
 
-func isExeDev() bool {
-	_, err := os.Stat("/exe.dev")
-	return err == nil
-}
-
 // collectSkills discovers skills from default directories and project skills dirs.
 // It does NOT walk the entire project tree, since that would pick up application
 // skills (e.g. in pkg/ or assets/) that are not meant for the coding agent.
@@ -410,12 +379,6 @@ func resolveAndNormalize(path string) string {
 		path = resolved
 	}
 	return strings.ToLower(path)
-}
-
-func isSudoAvailable() bool {
-	cmd := exec.Command("sudo", "-n", "id")
-	_, err := cmd.CombinedOutput()
-	return err == nil
 }
 
 // SubagentSystemPromptData contains data for subagent system prompts (minimal subset).

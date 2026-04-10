@@ -496,7 +496,7 @@ func TestDistillContentSentToLLM_WithEarlySSE(t *testing.T) {
 	// which triggers getOrCreateConversationManager -> Hydrate BEFORE
 	// the distilled message is written.
 	// This forces hydration with an empty history.
-	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID, "")
+	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID)
 	if err != nil {
 		t.Fatalf("failed to get/create conversation manager: %v", err)
 	}
@@ -642,7 +642,7 @@ func TestDistillStatusUpdateReachesSSESubscriber(t *testing.T) {
 	}
 
 	// Get the conversation manager and mark it as distilling
-	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID, "")
+	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID)
 	if err != nil {
 		t.Fatalf("failed to create conversation manager: %v", err)
 	}
@@ -1072,7 +1072,7 @@ func TestDistillReplaceQueuedMessagesDuringDistillation(t *testing.T) {
 
 	// Immediately queue a message to the new conversation while distillation is in progress.
 	// The ConversationManager should exist (created in handleDistillReplace) with distilling=true.
-	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID, "")
+	manager, err := h.server.getOrCreateConversationManager(context.Background(), newConvID)
 	if err != nil {
 		t.Fatalf("failed to get conversation manager: %v", err)
 	}

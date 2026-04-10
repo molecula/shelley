@@ -43,7 +43,7 @@ func (a *SlackConversationAPI) NewConversation(ctx context.Context, message, mod
 		Conversation: conversation,
 	})
 
-	manager, err := a.server.getOrCreateConversationManager(ctx, convID, "")
+	manager, err := a.server.getOrCreateConversationManager(ctx, convID)
 	if err != nil {
 		return "", fmt.Errorf("get conversation manager: %w", err)
 	}
@@ -86,7 +86,7 @@ func (a *SlackConversationAPI) SendMessage(ctx context.Context, conversationID, 
 		return fmt.Errorf("get llm service: %w", err)
 	}
 
-	manager, err := a.server.getOrCreateConversationManager(ctx, conversationID, "")
+	manager, err := a.server.getOrCreateConversationManager(ctx, conversationID)
 	if err != nil {
 		return fmt.Errorf("get conversation manager: %w", err)
 	}

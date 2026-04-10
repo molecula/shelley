@@ -189,7 +189,7 @@ export const zhCN: TranslationKeys = {
   welcomeTitle: "Shelley Agent",
   welcomeSubtitle: "",
   welcomeMessage:
-    "Shelley 是一个运行在 {hostname} 上的代理。你可以让 Shelley 帮你完成各种任务。如果你使用 Shelley 构建了网站，可以通过 exe.dev 的代理功能（参见 {docsLink}）在 {proxyLink} 上访问。",
+    "Shelley 是一个运行在 {hostname} 上的代理。你可以让 Shelley 帮你完成各种任务。",
   sendMessageToStart: "发送消息以开始对话。",
   noModelsConfiguredHint: "未配置 AI 模型。按 Ctrl+K 或 ⌘+K 添加模型。",
 

@@ -533,6 +533,13 @@ func isPermissionError(err error) bool {
 	return errors.Is(err, fs.ErrPermission) || errors.Is(err, os.ErrPermission)
 }
 
+// isSudoAvailable checks if passwordless sudo is available.
+func isSudoAvailable() bool {
+	cmd := exec.Command("sudo", "-n", "id")
+	_, err := cmd.CombinedOutput()
+	return err == nil
+}
+
 // doSudoUpgrade performs the upgrade using sudo when the binary isn't writable.
 func (vc *VersionChecker) doSudoUpgrade(binaryData []byte) error {
 	// Get the path to the current executable
