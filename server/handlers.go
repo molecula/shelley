@@ -538,15 +538,8 @@ func (s *Server) serveIndexWithInit(w http.ResponseWriter, r *http.Request, fs h
 		}
 	}
 
-	// Get hostname (add .exe.xyz suffix if no dots, matching system_prompt.go)
-	hostname := "localhost"
-	if h, err := os.Hostname(); err == nil {
-		if !strings.Contains(h, ".") {
-			hostname = h + ".exe.xyz"
-		} else {
-			hostname = h
-		}
-	}
+	// Get hostname
+	hostname := publicHostname()
 
 	// Get default working directory
 	defaultCwd, err := os.Getwd()
@@ -840,10 +833,8 @@ func (s *Server) handleChatConversation(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	userEmail := r.Header.Get("X-ExeDev-Email")
-
 	// Get or create conversation manager
-	manager, err := s.getOrCreateConversationManager(ctx, conversationID, userEmail)
+	manager, err := s.getOrCreateConversationManager(ctx, conversationID)
 	if errors.Is(err, errConversationModelMismatch) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -970,10 +961,8 @@ func (s *Server) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		Conversation: conversation,
 	})
 
-	userEmail := r.Header.Get("X-ExeDev-Email")
-
 	// Get or create conversation manager
-	manager, err := s.getOrCreateConversationManager(ctx, conversationID, userEmail)
+	manager, err := s.getOrCreateConversationManager(ctx, conversationID)
 	if errors.Is(err, errConversationModelMismatch) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1134,7 +1123,7 @@ func (s *Server) handleStreamConversation(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get or create conversation manager to access working state
-	manager, err := s.getOrCreateConversationManager(ctx, conversationID, "")
+	manager, err := s.getOrCreateConversationManager(ctx, conversationID)
 	if err != nil {
 		s.logger.Error("Failed to get conversation manager", "conversationID", conversationID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

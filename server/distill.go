@@ -157,7 +157,7 @@ func (s *Server) handleDistillConversation(w http.ResponseWriter, r *http.Reques
 
 	// Mark the conversation as distilling so queued messages wait for
 	// distillation to complete before being drained.
-	manager, err := s.getOrCreateConversationManager(ctx, conversationID, "")
+	manager, err := s.getOrCreateConversationManager(ctx, conversationID)
 	if err != nil {
 		s.logger.Error("Failed to create conversation manager for distill", "conversationID", conversationID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -447,7 +447,7 @@ func (s *Server) handleDistillReplace(w http.ResponseWriter, r *http.Request) {
 	go s.notifySubscribers(context.WithoutCancel(ctx), conversationID)
 
 	// Mark the conversation as distilling so queued messages wait.
-	manager, err := s.getOrCreateConversationManager(ctx, conversationID, "")
+	manager, err := s.getOrCreateConversationManager(ctx, conversationID)
 	if err != nil {
 		s.logger.Error("Failed to create conversation manager for distill-replace", "conversationID", conversationID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

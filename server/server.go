@@ -706,7 +706,7 @@ func (s *Server) handleCreateDirectory(w http.ResponseWriter, r *http.Request) {
 }
 
 // getOrCreateConversationManager gets an existing conversation manager or creates a new one.
-func (s *Server) getOrCreateConversationManager(ctx context.Context, conversationID, userEmail string) (*ConversationManager, error) {
+func (s *Server) getOrCreateConversationManager(ctx context.Context, conversationID string) (*ConversationManager, error) {
 	manager, err, _ := s.conversationGroup.Do(conversationID, func() (*ConversationManager, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -724,7 +724,6 @@ func (s *Server) getOrCreateConversationManager(ctx context.Context, conversatio
 		}
 
 		manager := NewConversationManager(conversationID, s.db, s.logger, s.toolSetConfig, recordMessage, onStateChange)
-		manager.userEmail = userEmail
 		manager.alwaysOnSkills = s.alwaysOnSkills
 		if err := manager.Hydrate(ctx); err != nil {
 			return nil, err
@@ -1129,9 +1128,6 @@ func (s *Server) refreshAllPRs() {
 // publicHostname returns the server's public hostname.
 func publicHostname() string {
 	if h, err := os.Hostname(); err == nil {
-		if !strings.Contains(h, ".") {
-			return h + ".exe.xyz"
-		}
 		return h
 	}
 	return "localhost"
