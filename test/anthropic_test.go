@@ -155,9 +155,15 @@ func TestWithAnthropicAPI(t *testing.T) {
 					t.Fatal("Assistant response has no content")
 				}
 
-				responseText := llmMsg.Content[0].Text
+				var responseText string
+				for _, c := range llmMsg.Content {
+					if c.Type == llm.ContentTypeText && c.Text != "" {
+						responseText = c.Text
+						break
+					}
+				}
 				if responseText == "" {
-					t.Fatal("Assistant response text is empty")
+					t.Fatal("Assistant response has no text content (may be all thinking blocks)")
 				}
 
 				// Claude should mention being Claude or an AI assistant
