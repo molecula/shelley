@@ -397,15 +397,31 @@ const Message = React.memo(function Message({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showActionBar]);
 
+  // Fallback copy for non-secure contexts where navigator.clipboard is unavailable
+  const fallbackCopy = (text: string) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  };
+
   // Handle copy action
   const handleCopy = () => {
     const text = getMessageText();
     if (text) {
-      navigator.clipboard.writeText(text).catch((err) => {
-        console.error("Failed to copy text:", err);
-      });
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
     }
-    setShowActionBar(false);
+    // Don't hide the action bar — let the checkmark feedback show
   };
 
   // Handle usage detail action
