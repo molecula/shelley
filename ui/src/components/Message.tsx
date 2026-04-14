@@ -518,8 +518,8 @@ const Message = React.memo(function Message({
             />
           );
         }
-        // Use specialized component for patch tool
-        if (content.ToolName === "patch") {
+        // Use specialized component for patch/edit tools
+        if (content.ToolName === "patch" || content.ToolName === "edit") {
           return (
             <PatchTool
               toolInput={content.ToolInput}
@@ -656,8 +656,8 @@ const Message = React.memo(function Message({
           );
         }
 
-        // Use specialized component for patch tool
-        if (toolName === "patch") {
+        // Use specialized component for patch/edit tools
+        if (toolName === "patch" || toolName === "edit") {
           return (
             <PatchTool
               toolInput={toolInput}
