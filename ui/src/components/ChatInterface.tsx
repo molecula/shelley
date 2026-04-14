@@ -417,6 +417,7 @@ interface CoalescedToolCallProps {
 const TOOL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   bash: BashTool,
   patch: PatchTool,
+  edit: PatchTool,
   browser: BrowserTool,
   screenshot: ScreenshotTool,
   read_image: ReadImageTool,
@@ -474,7 +475,7 @@ const CoalescedToolCall = React.memo(function CoalescedToolCall({
       hasError: toolError,
       executionTime,
       display,
-      ...(toolName === "patch" && onCommentTextChange ? { onCommentTextChange } : {}),
+      ...((toolName === "patch" || toolName === "edit") && onCommentTextChange ? { onCommentTextChange } : {}),
       ...(streamingOutput !== undefined ? { streamingOutput } : {}),
     };
     return <ToolComponent {...props} />;
