@@ -17,7 +17,7 @@ handling LLM interactions, tool execution, and message recording.
 
 ```go
 // Create tools (using claudetool package or custom tools)
-tools := []*llm.Tool{bashTool, patchTool, thinkTool}
+tools := []*llm.Tool{bashTool, editTool, readTool}
 
 // Define message recording function (typically saves to the database)
 recordMessage := func(ctx context.Context, message llm.Message, usage llm.Usage) error {

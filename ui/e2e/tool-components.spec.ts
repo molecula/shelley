@@ -71,10 +71,10 @@ test.describe('Tool Component Verification', () => {
     await expect(thinkingContent.first()).toBeVisible();
     await expect(thinkingContent.locator('text=💭').first()).toBeVisible();
 
-    // Verify patch tool uses PatchTool component (has patch-tool class)
-    const patchTool = page.locator('.patch-tool').first();
-    await expect(patchTool).toBeVisible();
-    await expect(patchTool.locator('.patch-tool-emoji')).toBeVisible();
+    // Verify edit tool uses PatchTool component (has patch-tool class)
+    const editTool = page.locator('.patch-tool').first();
+    await expect(editTool).toBeVisible();
+    await expect(editTool.locator('.patch-tool-emoji')).toBeVisible();
 
     // Verify screenshot tool uses ScreenshotTool component (has screenshot-tool class)
     const screenshotTool = page.locator('.screenshot-tool').first();
@@ -200,40 +200,40 @@ test.describe('Tool Component Verification', () => {
     await expect(navigateTool.locator('.tool-command').filter({ hasText: 'https://example.com' })).toBeVisible();
   });
 
-  test('patch tool can be collapsed and expanded without errors', async ({ page, request }) => {
-    const slug = await createConversation(request, 'patch success');
+  test('edit tool can be collapsed and expanded without errors', async ({ page, request }) => {
+    const slug = await createConversation(request, 'edit success');
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for successful patch tool
-    const patchTool = page.locator('.patch-tool[data-testid="tool-call-completed"]').filter({ hasText: 'test-patch-success.txt' }).first();
-    await expect(patchTool).toBeVisible({ timeout: 15000 });
+    // Wait for successful edit tool
+    const editToolEl = page.locator('.patch-tool[data-testid="tool-call-completed"]').filter({ hasText: 'test-patch-success.txt' }).first();
+    await expect(editToolEl).toBeVisible({ timeout: 15000 });
 
     // Get console errors before toggling
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    const header = patchTool.locator('.patch-tool-header');
+    const header = editToolEl.locator('.patch-tool-header');
 
     // The toggle button should exist and respond to clicks
-    const toggle = patchTool.locator('.patch-tool-toggle');
+    const toggle = editToolEl.locator('.patch-tool-toggle');
     await expect(toggle).toBeVisible();
 
     // Click to collapse
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeHidden();
+    await expect(editToolEl.locator('.patch-tool-details')).toBeHidden();
 
     // Expand
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
+    await expect(editToolEl.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
 
     // Collapse again
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeHidden();
+    await expect(editToolEl.locator('.patch-tool-details')).toBeHidden();
 
     // Expand again
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
+    await expect(editToolEl.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
 
     // Check no Monaco model errors occurred
     const modelErrors = errors.filter(e => e.includes('model') && e.includes('already exists'));

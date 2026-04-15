@@ -258,27 +258,27 @@ test.describe('Shelley Conversation Tests', () => {
     await expect(page.locator('text=💭').first()).toBeVisible();
   });
   
-  test('handles patch tool correctly', async ({ page }) => {
+  test('handles edit tool correctly', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     
     const messageInput = page.getByTestId('message-input');
     const sendButton = page.getByTestId('send-button');
     
-    // Send a message that triggers patch tool
-    await messageInput.fill('patch: test.txt');
+    // Send a message that triggers edit tool
+    await messageInput.fill('edit: test.txt');
     await sendButton.click();
     
-    // The predictable model should use the patch tool
+    // The predictable model should use the edit tool
     await page.waitForFunction(
-      () => document.body.textContent?.includes('I\'ll patch the file: test.txt') ?? false,
+      () => document.body.textContent?.includes('I\'ll edit the file: test.txt') ?? false,
       undefined,
       { timeout: 30000 }
     );
     
-    // Verify patch tool usage appears in the UI
+    // Verify edit tool usage appears in the UI
     await expect(page.locator('[data-testid="tool-call-completed"]').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=patch').first()).toBeVisible();
+    await expect(page.locator('text=edit').first()).toBeVisible();
   });
   
   test('displays tool results with collapsible details', async ({ page }) => {
@@ -324,8 +324,8 @@ test.describe('Shelley Conversation Tests', () => {
       { timeout: 30000 }
     );
     
-    // Third tool call: patch
-    await messageInput.fill('patch: example.txt');
+    // Third tool call: edit
+    await messageInput.fill('edit: example.txt');
     await sendButton.click();
     
     // Wait for at least 3 tool calls
@@ -338,12 +338,12 @@ test.describe('Shelley Conversation Tests', () => {
     // Verify all the specific messages we sent are visible
     await expect(page.locator('text=bash: echo "first command"')).toBeVisible();
     await expect(page.locator('text=think: analyzing the output')).toBeVisible();
-    await expect(page.locator('text=patch: example.txt')).toBeVisible();
+    await expect(page.locator('text=edit: example.txt')).toBeVisible();
     
     // Verify all tool types are visible
     await expect(page.locator('text=bash').first()).toBeVisible();
     await expect(page.locator('text=think').first()).toBeVisible();
-    await expect(page.locator('text=patch').first()).toBeVisible();
+    await expect(page.locator('text=edit').first()).toBeVisible();
   });
 });
 

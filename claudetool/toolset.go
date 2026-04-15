@@ -287,14 +287,6 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 		ConversationID:   cfg.ConversationID,
 	}
 
-	// Use simplified patch schema for weaker models, full schema for sonnet/opus
-	simplified := !isStrongModel(cfg.ModelID)
-	patchTool := &PatchTool{
-		Simplified:       simplified,
-		WorkingDir:       wd,
-		ClipboardEnabled: true,
-	}
-
 	keywordTool := NewKeywordToolWithWorkingDir(cfg.LLMProvider, wd)
 
 	changeDirTool := &ChangeDirTool{
@@ -309,7 +301,6 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 
 	tools := []*llm.Tool{
 		bashTool.Tool(),
-		patchTool.Tool(),
 		readTool.Tool(),
 		editTool.Tool(),
 		keywordTool.Tool(),

@@ -416,8 +416,8 @@ interface CoalescedToolCallProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TOOL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   bash: BashTool,
-  patch: PatchTool,
   edit: PatchTool,
+  patch: PatchTool, // Backwards compat: old conversations have "patch" tool calls
   browser: BrowserTool,
   screenshot: ScreenshotTool,
   read_image: ReadImageTool,

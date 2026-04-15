@@ -1222,19 +1222,19 @@ func TestPredictableServiceThinking(t *testing.T) {
 	}
 }
 
-func TestPredictableServicePatchTool(t *testing.T) {
+func TestPredictableServiceEditTool(t *testing.T) {
 	service := NewPredictableService()
 
 	ctx := context.Background()
 	req := &llm.Request{
 		Messages: []llm.Message{
-			{Role: llm.MessageRoleUser, Content: []llm.Content{{Type: llm.ContentTypeText, Text: "patch: /tmp/test.txt"}}},
+			{Role: llm.MessageRoleUser, Content: []llm.Content{{Type: llm.ContentTypeText, Text: "edit: /tmp/test.txt"}}},
 		},
 	}
 
 	resp, err := service.Do(ctx, req)
 	if err != nil {
-		t.Fatalf("patch tool test failed: %v", err)
+		t.Fatalf("edit tool test failed: %v", err)
 	}
 
 	if resp.StopReason != llm.StopReasonToolUse {
@@ -1244,14 +1244,14 @@ func TestPredictableServicePatchTool(t *testing.T) {
 	// Find the tool use content
 	var toolUseContent *llm.Content
 	for _, content := range resp.Content {
-		if content.Type == llm.ContentTypeToolUse && content.ToolName == "patch" {
+		if content.Type == llm.ContentTypeToolUse && content.ToolName == "edit" {
 			toolUseContent = &content
 			break
 		}
 	}
 
 	if toolUseContent == nil {
-		t.Fatal("no patch tool use content found")
+		t.Fatal("no edit tool use content found")
 	}
 
 	// Check tool input contains the file path
@@ -1265,19 +1265,19 @@ func TestPredictableServicePatchTool(t *testing.T) {
 	}
 }
 
-func TestPredictableServiceMalformedPatchTool(t *testing.T) {
+func TestPredictableServiceMalformedEditTool(t *testing.T) {
 	service := NewPredictableService()
 
 	ctx := context.Background()
 	req := &llm.Request{
 		Messages: []llm.Message{
-			{Role: llm.MessageRoleUser, Content: []llm.Content{{Type: llm.ContentTypeText, Text: "patch bad json"}}},
+			{Role: llm.MessageRoleUser, Content: []llm.Content{{Type: llm.ContentTypeText, Text: "edit bad json"}}},
 		},
 	}
 
 	resp, err := service.Do(ctx, req)
 	if err != nil {
-		t.Fatalf("malformed patch tool test failed: %v", err)
+		t.Fatalf("malformed edit tool test failed: %v", err)
 	}
 
 	if resp.StopReason != llm.StopReasonToolUse {
@@ -1287,20 +1287,23 @@ func TestPredictableServiceMalformedPatchTool(t *testing.T) {
 	// Find the tool use content
 	var toolUseContent *llm.Content
 	for _, content := range resp.Content {
-		if content.Type == llm.ContentTypeToolUse && content.ToolName == "patch" {
+		if content.Type == llm.ContentTypeToolUse && content.ToolName == "edit" {
 			toolUseContent = &content
 			break
 		}
 	}
 
 	if toolUseContent == nil {
-		t.Fatal("no patch tool use content found")
+		t.Fatal("no edit tool use content found")
 	}
 
-	// Check that the tool input is malformed JSON (as expected)
-	toolInputStr := string(toolUseContent.ToolInput)
-	if !strings.Contains(toolInputStr, "parameter name") {
-		t.Errorf("expected malformed JSON in tool input, got: %s", toolInputStr)
+	// Check that the tool input is malformed (edits is a string, not array)
+	var toolInput map[string]interface{}
+	if err := json.Unmarshal(toolUseContent.ToolInput, &toolInput); err != nil {
+		t.Fatalf("failed to parse tool input: %v", err)
+	}
+	if _, ok := toolInput["edits"]; !ok {
+		t.Error("expected edits field in tool input")
 	}
 }
 
