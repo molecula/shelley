@@ -188,3 +188,140 @@ func TestEditToolDelete(t *testing.T) {
 		t.Fatalf("got %q, want %q", result, "a\nd")
 	}
 }
+
+func TestEditToolOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "new.txt")
+
+	wd := &MutableWorkingDir{}
+	wd.Set(dir)
+	tool := &EditTool{WorkingDir: wd}
+
+	input := map[string]any{
+		"path": "new.txt",
+		"edits": []map[string]any{{
+			"loc":     "overwrite",
+			"content": []string{"line1", "line2", "line3"},
+		}},
+	}
+	m, _ := json.Marshal(input)
+	out := tool.Run(context.Background(), m)
+	if out.Error != nil {
+		t.Fatalf("overwrite failed: %v", out.Error)
+	}
+
+	result := readTestFile(t, p)
+	if result != "line1\nline2\nline3" {
+		t.Fatalf("got %q", result)
+	}
+}
+
+func TestEditToolOverwriteExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	p := writeTestFile(t, dir, "existing.txt", "old content")
+
+	wd := &MutableWorkingDir{}
+	wd.Set(dir)
+	tool := &EditTool{WorkingDir: wd}
+
+	input := map[string]any{
+		"path": "existing.txt",
+		"edits": []map[string]any{{
+			"loc":     "overwrite",
+			"content": []string{"new content"},
+		}},
+	}
+	m, _ := json.Marshal(input)
+	out := tool.Run(context.Background(), m)
+	if out.Error != nil {
+		t.Fatalf("overwrite failed: %v", out.Error)
+	}
+
+	result := readTestFile(t, p)
+	if result != "new content" {
+		t.Fatalf("got %q", result)
+	}
+}
+
+func TestEditToolOverwriteCreatesDir(t *testing.T) {
+	dir := t.TempDir()
+
+	wd := &MutableWorkingDir{}
+	wd.Set(dir)
+	tool := &EditTool{WorkingDir: wd}
+
+	input := map[string]any{
+		"path": "sub/dir/new.txt",
+		"edits": []map[string]any{{
+			"loc":     "overwrite",
+			"content": []string{"hello"},
+		}},
+	}
+	m, _ := json.Marshal(input)
+	out := tool.Run(context.Background(), m)
+	if out.Error != nil {
+		t.Fatalf("overwrite failed: %v", out.Error)
+	}
+
+	result := readTestFile(t, filepath.Join(dir, "sub/dir/new.txt"))
+	if result != "hello" {
+		t.Fatalf("got %q", result)
+	}
+}
+
+func TestEditToolOverwriteMustBeSoleEdit(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "test.txt", "hello")
+
+	wd := &MutableWorkingDir{}
+	wd.Set(dir)
+	tool := &EditTool{WorkingDir: wd}
+
+	input := map[string]any{
+		"path": "test.txt",
+		"edits": []map[string]any{
+			{"loc": "overwrite", "content": []string{"new"}},
+			{"loc": "append", "content": []string{"extra"}},
+		},
+	}
+	m, _ := json.Marshal(input)
+	out := tool.Run(context.Background(), m)
+	if out.Error == nil {
+		t.Fatal("expected error when overwrite combined with other edits")
+	}
+}
+
+func TestEditToolMove(t *testing.T) {
+	dir := t.TempDir()
+	content := "a\nb\nc\nd\ne"
+	p := writeTestFile(t, dir, "test.txt", content)
+
+	wd := &MutableWorkingDir{}
+	wd.Set(dir)
+	tool := &EditTool{WorkingDir: wd}
+
+	lines := strings.Split(content, "\n")
+
+	input := map[string]any{
+		"path": "test.txt",
+		"edits": []map[string]any{{
+			"loc": map[string]any{
+				"move": map[string]string{
+					"pos":   tagFor(2, lines[1]),
+					"end":   tagFor(3, lines[2]),
+					"after": tagFor(4, lines[3]),
+				},
+			},
+		}},
+	}
+	m, _ := json.Marshal(input)
+	out := tool.Run(context.Background(), m)
+	if out.Error != nil {
+		t.Fatalf("move failed: %v", out.Error)
+	}
+
+	result := readTestFile(t, p)
+	if result != "a\nd\nb\nc\ne" {
+		t.Fatalf("got %q, want %q", result, "a\nd\nb\nc\ne")
+	}
+}

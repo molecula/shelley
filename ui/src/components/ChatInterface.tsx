@@ -2,10 +2,12 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import {
   Message,
   Conversation,
+  ConversationWithState,
   StreamResponse,
   LLMContent,
   ConversationListUpdate,
   ToolProgress,
+  PRInfo,
   isDistillStatusMessage,
   isQueuedMessage,
 } from "../types";
@@ -25,9 +27,6 @@ import {
 import MessageComponent from "./Message";
 import MessageInput from "./MessageInput";
 import DiffViewer from "./DiffViewer";
-import MessageSelectionToolbar from "./MessageSelectionToolbar";
-import { buildMessageQuote } from "../utils/messageQuote";
-import GitGraphViewer from "./GitGraphViewer";
 import AgentsMdEditorModal from "./AgentsMdEditorModal";
 import BashTool from "./BashTool";
 import PatchTool from "./PatchTool";
@@ -54,6 +53,156 @@ import TerminalPanel, { EphemeralTerminal } from "./TerminalPanel";
 import ModelPicker from "./ModelPicker";
 import ModelBar from "./ModelBar";
 import SystemPromptView from "./SystemPromptView";
+
+function formatCwdForDisplay(cwd: string | null | undefined): string | null {
+  if (!cwd) return null;
+  const homeDir = window.__SHELLEY_INIT__?.home_dir;
+  if (homeDir && cwd === homeDir) return "~";
+  if (homeDir && cwd.startsWith(homeDir + "/")) return "~" + cwd.slice(homeDir.length);
+  return cwd;
+}
+
+function prStateLabel(pr: PRInfo): string {
+  if (pr.state === "MERGED") return "merged";
+  if (pr.state === "CLOSED") return "closed";
+  if (pr.is_draft) return "draft";
+  if (pr.in_merge_queue) return "merge queue";
+  if (pr.review_decision === "APPROVED") return "approved";
+  if (pr.review_decision === "CHANGES_REQUESTED") return "changes requested";
+  return "open";
+}
+
+function prStateClass(pr: PRInfo): string {
+  if (pr.state === "MERGED") return "pr-merged";
+  if (pr.state === "CLOSED") return "pr-closed";
+  if (pr.is_draft) return "pr-draft";
+  if (pr.in_merge_queue) return "pr-queued";
+  if (pr.review_decision === "APPROVED") return "pr-approved";
+  if (pr.review_decision === "CHANGES_REQUESTED") return "pr-changes";
+  return "pr-open";
+}
+
+function PRBadge({ pr }: { pr: PRInfo }) {
+  return (
+    <a
+      href={pr.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`pr-badge ${prStateClass(pr)}`}
+      title={`#${pr.number}: ${pr.title} (${prStateLabel(pr)})`}
+    >
+      <svg className="pr-icon" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+      </svg>
+      <span className="pr-number">#{pr.number}</span>
+      <span className="pr-state">{prStateLabel(pr)}</span>
+    </a>
+  );
+}
+
+async function traverseFileTree(entry: FileSystemEntry): Promise<{ file: File; path: string }[]> {
+  if (entry.isFile) {
+    return new Promise((resolve, reject) => {
+      (entry as FileSystemFileEntry).file((f) => resolve([{ file: f, path: entry.fullPath.replace(/^\//, "") }]), reject);
+    });
+  }
+  const dirReader = (entry as FileSystemDirectoryEntry).createReader();
+  const entries: FileSystemEntry[] = await new Promise((resolve, reject) => {
+    dirReader.readEntries(resolve, reject);
+  });
+  const results: { file: File; path: string }[] = [];
+  for (const child of entries) {
+    results.push(...(await traverseFileTree(child)));
+  }
+  return results;
+}
+
+function CwdDropZone({ cwd }: { cwd: string }) {
+  const [dragOver, setDragOver] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const dragCounter = React.useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) setDragOver(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setDragOver(false);
+
+    // Collect files with relative paths (supports folders via webkitGetAsEntry)
+    const filePairs: { file: File; path: string }[] = [];
+    const items = e.dataTransfer.items;
+    if (items) {
+      const entries: FileSystemEntry[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.();
+        if (entry) entries.push(entry);
+      }
+      for (const entry of entries) {
+        filePairs.push(...(await traverseFileTree(entry)));
+      }
+    }
+    // Fallback: plain file list (no folder support)
+    if (filePairs.length === 0 && e.dataTransfer.files.length > 0) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const f = e.dataTransfer.files[i];
+        filePairs.push({ file: f, path: f.name });
+      }
+    }
+
+    if (filePairs.length === 0) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("cwd", cwd);
+      formData.append("paths", JSON.stringify(filePairs.map((fp) => fp.path)));
+      for (const fp of filePairs) {
+        formData.append("file", fp.file);
+      }
+      const resp = await fetch("/api/upload-to-cwd", { method: "POST", body: formData });
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error("Upload to cwd failed:", text);
+      }
+    } catch (err) {
+      console.error("Upload to cwd failed:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <span
+      className={`status-cwd status-cwd-dropzone${dragOver ? " status-cwd-drag-over" : ""}${uploading ? " status-cwd-uploading" : ""}`}
+      title={`${cwd}\nDrop files here to upload`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {uploading ? "Uploading…" : formatCwdForDisplay(cwd)}
+    </span>
+  );
+}
 
 interface ContextUsageBarProps {
   contextWindowSize: number;
@@ -267,9 +416,8 @@ interface CoalescedToolCallProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TOOL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   bash: BashTool,
-  shell: BashTool,
-  patch: PatchTool,
   edit: PatchTool,
+  patch: PatchTool, // Backwards compat: old conversations have "patch" tool calls
   browser: BrowserTool,
   screenshot: ScreenshotTool,
   read_image: ReadImageTool,
@@ -460,31 +608,17 @@ const CoalescedToolCall = React.memo(function CoalescedToolCall({
   );
 });
 
-// Animated "Agent working..." with letter-by-letter bold animation.
-// On narrow viewports drop the "Agent " prefix so it fits on one line.
+// Animated "Agent working..." with letter-by-letter bold animation
 function AnimatedWorkingStatus() {
-  const [isNarrow, setIsNarrow] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 600px)").matches : false,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 600px)");
-    const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  const text = isNarrow ? "working..." : "Agent working...";
+  const text = "Agent working...";
   const [boldIndex, setBoldIndex] = useState(0);
 
   useEffect(() => {
-    setBoldIndex(0);
     const interval = setInterval(() => {
       setBoldIndex((prev) => (prev + 1) % text.length);
     }, 100); // 100ms per letter
     return () => clearInterval(interval);
-  }, [text]);
+  }, []);
 
   return (
     <span className="status-message animated-working">
@@ -508,7 +642,7 @@ interface ChatInterfaceProps {
   onOpenDrawer: () => void;
   onNewConversation: () => void;
   onArchiveConversation?: (conversationId: string) => Promise<void>;
-  currentConversation?: Conversation;
+  currentConversation?: ConversationWithState;
   onConversationUpdate?: (conversation: Conversation) => void;
   onConversationListUpdate?: (update: ConversationListUpdate) => void;
   onConversationStateUpdate?: (state: ConversationStateUpdate) => void;
@@ -518,7 +652,6 @@ interface ChatInterfaceProps {
     cwd?: string,
     conversationType?: "normal" | "orchestrator",
     subagentBackend?: "shelley" | "claude-cli" | "codex-cli",
-    toolOverrides?: Record<string, "on" | "off">,
   ) => Promise<void>;
   onDistillConversation?: (
     sourceConversationId: string,
@@ -534,6 +667,7 @@ interface ChatInterfaceProps {
   isDrawerCollapsed?: boolean;
   onToggleDrawerCollapse?: () => void;
   openDiffViewerTrigger?: number; // increment to trigger opening diff viewer
+  openDirectoryPickerTrigger?: number; // increment to trigger opening directory picker
   modelsRefreshTrigger?: number; // increment to trigger models list refresh
   onOpenModelsModal?: () => void;
   onReconnect?: () => void;
@@ -663,6 +797,7 @@ function ChatInterface({
   isDrawerCollapsed,
   onToggleDrawerCollapse,
   openDiffViewerTrigger,
+  openDirectoryPickerTrigger,
   modelsRefreshTrigger,
   onOpenModelsModal,
   onReconnect,
@@ -730,12 +865,11 @@ function ChatInterface({
     }
   }, [currentConversation?.conversation_id]);
 
-  // Reset cwdInitialized and subagent backend when switching to a new conversation.
-  // Tool overrides are intentionally NOT reset — they persist across conversations
-  // via localStorage so the user's choices stick.
+  // Reset cwdInitialized and orchestrator mode when switching to a new conversation
   useEffect(() => {
     if (conversationId === null) {
       setCwdInitialized(false);
+      setOrchestratorMode(false);
       setSubagentBackend("shelley");
       setShowAdvancedSettings(false);
     }
@@ -806,19 +940,12 @@ function ChatInterface({
     isChannelEnabled("browser"),
   );
   const [showDiffViewer, setShowDiffViewer] = useState(false);
-  const [showGitGraph, setShowGitGraph] = useState(false);
   const [showAgentsMdEditor, setShowAgentsMdEditor] = useState(false);
   const [diffViewerInitialCommit, setDiffViewerInitialCommit] = useState<string | undefined>(
     undefined,
   );
   const [diffViewerCwd, setDiffViewerCwd] = useState<string | undefined>(undefined);
   const [diffCommentText, setDiffCommentText] = useState("");
-
-  // Inject a markdown comment block referencing a chat message into the composer.
-  // Uses a multi-line blockquote so the full selection is preserved.
-  const handleMessageComment = useCallback((messageId: string, snippet: string) => {
-    setDiffCommentText(buildMessageQuote(messageId, snippet));
-  }, []);
   const [agentWorking, setAgentWorking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -840,60 +967,13 @@ function ChatInterface({
   const [toolProgress, setToolProgress] = useState<Record<string, ToolProgress>>({});
   // Streaming LLM text: accumulated text from stream deltas
   const [streamingText, setStreamingText] = useState("");
+  const [orchestratorMode, setOrchestratorMode] = useState(false);
   const [subagentBackend, setSubagentBackend] = useState<"shelley" | "claude-cli" | "codex-cli">(
     "shelley",
   );
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const advancedSettingsRef = useRef<HTMLDivElement>(null);
   const cliAgents = window.__SHELLEY_INIT__?.cli_agents || [];
-
-  // Tool registry (fetched from server) and user overrides (persisted to localStorage).
-  // Value "on"/"off" = explicit override. Absent = use the registry's default_on.
-  // Special pseudo-tool name "orchestrator" maps to conversationType.
-  const [availableTools, setAvailableTools] = useState<
-    Array<{ name: string; summary: string; default_on: boolean }>
-  >([]);
-  const TOOL_OVERRIDES_KEY = "shelley.toolOverrides";
-  const [toolOverrides, setToolOverridesState] = useState<Record<string, "on" | "off">>(() => {
-    try {
-      const raw = localStorage.getItem(TOOL_OVERRIDES_KEY);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        const clean: Record<string, "on" | "off"> = {};
-        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-          if (v === "on" || v === "off") clean[k] = v;
-        }
-        return clean;
-      }
-    } catch {
-      /* ignore */
-    }
-    return {};
-  });
-  const setToolOverride = (name: string, value: "default" | "on" | "off") => {
-    setToolOverridesState((prev) => {
-      const next = { ...prev };
-      if (value === "default") delete next[name];
-      else next[name] = value;
-      try {
-        if (Object.keys(next).length === 0) {
-          localStorage.removeItem(TOOL_OVERRIDES_KEY);
-        } else {
-          localStorage.setItem(TOOL_OVERRIDES_KEY, JSON.stringify(next));
-        }
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
-  useEffect(() => {
-    api
-      .getTools()
-      .then((r) => setAvailableTools(r.tools))
-      .catch(() => {});
-  }, []);
 
   // Close advanced settings popover on click outside
   useEffect(() => {
@@ -1757,20 +1837,12 @@ function ChatInterface({
             throw new Error(`Invalid working directory: ${validation.error}`);
           }
         }
-        const orchestratorOn = toolOverrides["orchestrator"] === "on";
-        // Filter to only real tool overrides (exclude the "orchestrator" pseudo-tool).
-        const realOverrides: Record<string, "on" | "off"> = {};
-        for (const [k, v] of Object.entries(toolOverrides)) {
-          if (k === "orchestrator") continue;
-          realOverrides[k] = v;
-        }
         await onFirstMessage(
           message.trim(),
           selectedModel,
           selectedCwd || undefined,
-          orchestratorOn ? "orchestrator" : undefined,
-          orchestratorOn ? subagentBackend : undefined,
-          Object.keys(realOverrides).length > 0 ? realOverrides : undefined,
+          orchestratorMode ? "orchestrator" : undefined,
+          orchestratorMode ? subagentBackend : undefined,
         );
       } else if (conversationId) {
         await api.sendMessage(conversationId, {
@@ -1810,6 +1882,13 @@ function ChatInterface({
     }
   }, [openDiffViewerTrigger]);
 
+  // Handle external trigger to open directory picker
+  useEffect(() => {
+    if (openDirectoryPickerTrigger && openDirectoryPickerTrigger > 0) {
+      setShowDirectoryPicker(true);
+    }
+  }, [openDirectoryPickerTrigger]);
+
   const handleCancel = async () => {
     if (!conversationId || cancelling) return;
 
@@ -1824,6 +1903,21 @@ function ChatInterface({
       setCancelling(false);
     }
   };
+
+  // Ctrl+C to cancel agent turn
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "c" && (e.ctrlKey || e.metaKey) && agentWorking) {
+        // Only cancel if there's no text selection (preserve normal copy)
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) return;
+        e.preventDefault();
+        handleCancel();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [agentWorking, cancelling, conversationId]);
 
   // Handler to distill and continue conversation
   const handleDistillConversation = async () => {
@@ -2021,39 +2115,15 @@ function ChatInterface({
 
   const renderMessages = () => {
     if (messages.length === 0) {
-      const proxyURL = `https://${hostname}/`;
       return (
         <div className="empty-state">
           <div className="empty-state-content">
             <p className="text-base chat-welcome-text">
               {t("welcomeMessage")
-                .split(/(\{hostname\}|\{docsLink\}|\{proxyLink\})/)
+                .split(/(\{hostname\})/)
                 .map((part, i) => {
                   if (part === "{hostname}") return <strong key={i}>{hostname}</strong>;
-                  if (part === "{docsLink}")
-                    return (
-                      <a
-                        key={i}
-                        href="https://exe.dev/docs/proxy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="chat-welcome-link"
-                      >
-                        docs
-                      </a>
-                    );
-                  if (part === "{proxyLink}")
-                    return (
-                      <a
-                        key={i}
-                        href={proxyURL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="chat-welcome-link"
-                      >
-                        {proxyURL}
-                      </a>
-                    );
+
                   return part;
                 })}
             </p>
@@ -2176,7 +2246,7 @@ function ChatInterface({
             onClick={handleCancel}
             disabled={cancelling}
             className="status-stop-button"
-            title={cancelling ? "Cancelling..." : "Stop"}
+            title={cancelling ? "Cancelling..." : "Stop (Ctrl+C)"}
           >
             <svg viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="6" width="12" height="12" rx="1" />
@@ -2184,19 +2254,25 @@ function ChatInterface({
             <span className="status-stop-label">{cancelling ? "Cancelling..." : "Stop"}</span>
           </button>
         </div>
-        <ContextUsageBar
-          contextWindowSize={contextWindowSize}
-          maxContextTokens={
-            models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
-          }
-          conversationId={conversationId}
-          modelName={selectedModelDisplayName}
-          onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
-          onDistillReplaceConversation={
-            onDistillReplaceConversation ? handleDistillReplaceConversation : undefined
-          }
-          agentWorking={agentWorking}
-        />
+        <div className="status-bar-right">
+          {currentConversation?.cwd && (
+            <CwdDropZone cwd={currentConversation.cwd} />
+          )}
+          {currentConversation?.pr_info && <PRBadge pr={currentConversation.pr_info} />}
+          <ContextUsageBar
+            contextWindowSize={contextWindowSize}
+            maxContextTokens={
+              models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
+            }
+            conversationId={conversationId}
+            modelName={selectedModelDisplayName}
+            onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
+            onDistillReplaceConversation={
+              onDistillReplaceConversation ? handleDistillReplaceConversation : undefined
+            }
+            agentWorking={agentWorking}
+          />
+        </div>
       </div>
     ) : !conversationId ? (
       // New conversation — show model picker and cwd selector
@@ -2215,9 +2291,7 @@ function ChatInterface({
           />
           <div className="advanced-settings-wrapper" ref={advancedSettingsRef}>
             <button
-              className={`advanced-settings-trigger${
-                Object.keys(toolOverrides).length > 0 ? " active" : ""
-              }`}
+              className={`advanced-settings-trigger${orchestratorMode ? " active" : ""}`}
               onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
               title="Advanced settings"
               disabled={sending}
@@ -2238,101 +2312,59 @@ function ChatInterface({
             </button>
             {showAdvancedSettings && (
               <div className="advanced-settings-popover">
-                <div className="advanced-settings-header">
-                  <span>Tools</span>
-                  <button
-                    type="button"
-                    className="advanced-settings-reset"
-                    onClick={() => {
-                      setToolOverridesState({});
-                      try {
-                        localStorage.removeItem(TOOL_OVERRIDES_KEY);
-                      } catch {
-                        /* ignore */
-                      }
+                <div className="advanced-settings-header">Advanced Settings</div>
+                <label className="orchestrator-toggle">
+                  <input
+                    type="checkbox"
+                    checked={orchestratorMode}
+                    onChange={(e) => {
+                      setOrchestratorMode(e.target.checked);
+                      if (!e.target.checked) setSubagentBackend("shelley");
                     }}
-                    disabled={Object.keys(toolOverrides).length === 0}
-                    title="Clear all overrides"
-                  >
-                    Reset to defaults
-                  </button>
-                </div>
-                <div className="tool-override-list">
-                  {[
-                    {
-                      name: "orchestrator",
-                      summary: "Shelley orchestrator mode (delegates to subagents).",
-                      default_on: false,
-                    },
-                    ...availableTools,
-                  ].map((tool) => {
-                    const override = toolOverrides[tool.name];
-                    const current: "default" | "on" | "off" = override || "default";
-                    return (
-                      <React.Fragment key={tool.name}>
-                        <div className="tool-override-row">
-                          <div className="tool-override-info">
-                            <span className="tool-override-name">{tool.name}</span>
-                            {tool.name === "orchestrator" && (
-                              <span className="experimental-badge">experimental</span>
-                            )}
-                            <span className="tool-override-summary">{tool.summary}</span>
-                          </div>
-                          <div className="tool-override-choices" role="radiogroup">
-                            {(
-                              [
-                                ["default", `Default (${tool.default_on ? "on" : "off"})`],
-                                ["on", "On"],
-                                ["off", "Off"],
-                              ] as const
-                            ).map(([val, label]) => (
-                              <button
-                                key={val}
-                                type="button"
-                                role="radio"
-                                aria-checked={current === val}
-                                className={`tool-override-choice${current === val ? " active" : ""}`}
-                                onClick={() => setToolOverride(tool.name, val)}
-                                disabled={sending}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {tool.name === "orchestrator" && toolOverrides["orchestrator"] === "on" && (
-                          <div className="tool-override-row tool-override-suboption">
-                            <label
-                              className="tool-override-suboption-label"
-                              htmlFor="subagent-backend-select"
-                            >
-                              Subagent backend
-                            </label>
-                            <select
-                              id="subagent-backend-select"
-                              className="orchestrator-backend-dropdown"
-                              value={subagentBackend}
-                              onChange={(e) =>
-                                setSubagentBackend(
-                                  e.target.value as "shelley" | "claude-cli" | "codex-cli",
-                                )
-                              }
-                              disabled={sending}
-                            >
-                              <option value="shelley">Shelley (native)</option>
-                              {cliAgents.includes("claude-cli") && (
-                                <option value="claude-cli">Claude CLI</option>
-                              )}
-                              {cliAgents.includes("codex-cli") && (
-                                <option value="codex-cli">Codex CLI</option>
-                              )}
-                            </select>
-                          </div>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
+                    disabled={sending}
+                  />
+                  <span className="orchestrator-toggle-label">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="5" r="3" />
+                      <circle cx="5" cy="19" r="3" />
+                      <circle cx="19" cy="19" r="3" />
+                      <line x1="12" y1="8" x2="5" y2="16" />
+                      <line x1="12" y1="8" x2="19" y2="16" />
+                    </svg>
+                    Orchestrator
+                    <span className="experimental-badge">experimental</span>
+                  </span>
+                </label>
+                {orchestratorMode && (
+                  <div className="orchestrator-backend-select">
+                    <label className="orchestrator-backend-label">Subagent backend</label>
+                    <select
+                      className="orchestrator-backend-dropdown"
+                      value={subagentBackend}
+                      onChange={(e) =>
+                        setSubagentBackend(e.target.value as "shelley" | "claude-cli" | "codex-cli")
+                      }
+                      disabled={sending}
+                    >
+                      <option value="shelley">Shelley (native)</option>
+                      {cliAgents.includes("claude-cli") && (
+                        <option value="claude-cli">Claude CLI</option>
+                      )}
+                      {cliAgents.includes("codex-cli") && (
+                        <option value="codex-cli">Codex CLI</option>
+                      )}
+                    </select>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2358,19 +2390,25 @@ function ChatInterface({
           <span className="hide-on-mobile">Ready on </span>
           {hostname}
         </span>
-        <ContextUsageBar
-          contextWindowSize={contextWindowSize}
-          maxContextTokens={
-            models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
-          }
-          conversationId={conversationId}
-          modelName={selectedModelDisplayName}
-          onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
-          onDistillReplaceConversation={
-            onDistillReplaceConversation ? handleDistillReplaceConversation : undefined
-          }
-          agentWorking={agentWorking}
-        />
+        <div className="status-bar-right">
+          {currentConversation?.cwd && (
+            <CwdDropZone cwd={currentConversation.cwd} />
+          )}
+          {currentConversation?.pr_info && <PRBadge pr={currentConversation.pr_info} />}
+          <ContextUsageBar
+            contextWindowSize={contextWindowSize}
+            maxContextTokens={
+              models.find((m) => m.id === selectedModel)?.max_context_tokens || 200000
+            }
+            conversationId={conversationId}
+            modelName={selectedModelDisplayName}
+            onDistillConversation={onDistillConversation ? handleDistillConversation : undefined}
+            onDistillReplaceConversation={
+              onDistillReplaceConversation ? handleDistillReplaceConversation : undefined
+            }
+            agentWorking={agentWorking}
+          />
+        </div>
       </div>
     );
   }
@@ -2475,33 +2513,6 @@ function ChatInterface({
                       />
                     </svg>
                     {t("diffs")}
-                  </button>
-                )}
-                {(currentConversation?.cwd || selectedCwd) && (
-                  <button
-                    onClick={() => {
-                      setShowOverflowMenu(false);
-                      setShowGitGraph(true);
-                    }}
-                    className="overflow-menu-item"
-                  >
-                    <svg
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      className="chat-menu-icon"
-                    >
-                      <circle cx="6" cy="6" r="2" strokeWidth={2} />
-                      <circle cx="6" cy="18" r="2" strokeWidth={2} />
-                      <circle cx="18" cy="12" r="2" strokeWidth={2} />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 8v8M8 6h2a4 4 0 014 4v0M8 18h2a4 4 0 004-4v0"
-                      />
-                    </svg>
-                    {t("gitGraph")}
                   </button>
                 )}
                 {terminalURL && (
@@ -2934,21 +2945,6 @@ function ChatInterface({
           setCwdError(null);
         }}
         initialPath={selectedCwd}
-      />
-
-      <MessageSelectionToolbar onComment={handleMessageComment} />
-
-      {/* Git Graph Viewer */}
-      <GitGraphViewer
-        cwd={(diffViewerCwd || currentConversation?.cwd || selectedCwd) as string}
-        isOpen={showGitGraph}
-        onClose={() => setShowGitGraph(false)}
-        onOpenDiff={(commit, cwd) => {
-          setShowGitGraph(false);
-          setDiffViewerInitialCommit(commit);
-          setDiffViewerCwd(cwd);
-          setShowDiffViewer(true);
-        }}
       />
 
       {/* Diff Viewer */}

@@ -195,3 +195,61 @@ func TestApplyEditsUnknownOp(t *testing.T) {
 		t.Fatal("expected error for unknown op")
 	}
 }
+
+
+func TestApplyEditsMoveRange(t *testing.T) {
+	text := "a\nb\nc\nd\ne"
+	anchors := makeAnchors(text)
+
+	// Move lines 2-3 ("b","c") to after line 4 ("d")
+	result, err := ApplyEdits(text, []Edit{{
+		Op:      "move_range",
+		Pos:     anchorPtr(anchors[2]),
+		End:     anchorPtr(anchors[3]),
+		After:   anchorPtr(anchors[4]),
+		Content: nil,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "a\nd\nb\nc\ne"
+	if result != want {
+		t.Fatalf("got %q, want %q", result, want)
+	}
+}
+
+func TestApplyEditsMoveRangeUp(t *testing.T) {
+	text := "a\nb\nc\nd\ne"
+	anchors := makeAnchors(text)
+
+	// Move lines 4-5 ("d","e") to after line 1 ("a")
+	result, err := ApplyEdits(text, []Edit{{
+		Op:    "move_range",
+		Pos:   anchorPtr(anchors[4]),
+		End:   anchorPtr(anchors[5]),
+		After: anchorPtr(anchors[1]),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "a\nd\ne\nb\nc"
+	if result != want {
+		t.Fatalf("got %q, want %q", result, want)
+	}
+}
+
+func TestApplyEditsMoveRangeOverlap(t *testing.T) {
+	text := "a\nb\nc\nd\ne"
+	anchors := makeAnchors(text)
+
+	// After is within source range — should error
+	_, err := ApplyEdits(text, []Edit{{
+		Op:    "move_range",
+		Pos:   anchorPtr(anchors[2]),
+		End:   anchorPtr(anchors[4]),
+		After: anchorPtr(anchors[3]),
+	}})
+	if err == nil {
+		t.Fatal("expected error for overlapping move")
+	}
+}

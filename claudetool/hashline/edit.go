@@ -8,9 +8,10 @@ import (
 
 // Edit represents a single hashline edit operation.
 type Edit struct {
-	Op      string   // "replace_range", "append_at", "prepend_at", "append_file", "prepend_file"
+	Op      string   // "replace_range", "append_at", "prepend_at", "append_file", "prepend_file", "move_range"
 	Pos     *Anchor  // start anchor (nil for file-level ops)
-	End     *Anchor  // end anchor (only for replace_range)
+	End     *Anchor  // end anchor (only for replace_range and move_range)
+	After   *Anchor  // destination anchor (only for move_range)
 	Content []string // replacement/inserted lines; nil means delete
 }
 
@@ -50,6 +51,19 @@ func ApplyEdits(text string, edits []Edit) (string, error) {
 			}
 			validateRef(edit.Pos)
 			validateRef(edit.End)
+		case "move_range":
+			if edit.Pos == nil || edit.End == nil || edit.After == nil {
+				return "", fmt.Errorf("move_range requires pos, end, and after anchors")
+			}
+			if edit.Pos.Line > edit.End.Line {
+				return "", fmt.Errorf("range start line %d must be <= end line %d", edit.Pos.Line, edit.End.Line)
+			}
+			if edit.After.Line >= edit.Pos.Line && edit.After.Line <= edit.End.Line {
+				return "", fmt.Errorf("move_range destination line %d must not be within source range [%d, %d]", edit.After.Line, edit.Pos.Line, edit.End.Line)
+			}
+			validateRef(edit.Pos)
+			validateRef(edit.End)
+			validateRef(edit.After)
 		case "append_at", "prepend_at":
 			if edit.Pos == nil {
 				return "", fmt.Errorf("%s requires pos anchor", edit.Op)
@@ -68,11 +82,32 @@ func ApplyEdits(text string, edits []Edit) (string, error) {
 		if edit.End != nil && (edit.End.Line < 1 || edit.End.Line > len(fileLines)) {
 			return "", fmt.Errorf("line %d does not exist (file has %d lines)", edit.End.Line, len(fileLines))
 		}
+		if edit.After != nil && (edit.After.Line < 1 || edit.After.Line > len(fileLines)) {
+			return "", fmt.Errorf("line %d does not exist (file has %d lines)", edit.After.Line, len(fileLines))
+		}
 	}
 
 	if len(mismatches) > 0 {
 		return "", &HashMismatchError{Mismatches: mismatches, FileLines: fileLines}
 	}
+
+	// Expand move_range into delete + insert.
+	var expanded []Edit
+	for _, edit := range edits {
+		if edit.Op == "move_range" {
+			// Extract content from source.
+			content := make([]string, edit.End.Line-edit.Pos.Line+1)
+			copy(content, fileLines[edit.Pos.Line-1:edit.End.Line])
+			// Delete source.
+			expanded = append(expanded, Edit{Op: "replace_range", Pos: edit.Pos, End: edit.End, Content: nil})
+			// Insert at destination.
+			expanded = append(expanded, Edit{Op: "append_at", Pos: edit.After, Content: content})
+		} else {
+			expanded = append(expanded, edit)
+		}
+	}
+	edits = expanded
+	
 
 	// Compute sort key for bottom-up application.
 	type annotated struct {

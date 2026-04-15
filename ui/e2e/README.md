@@ -7,7 +7,7 @@ This directory contains end-to-end tests for the Shelley web interface using Pla
 - **Mobile-focused testing**: Primary focus on mobile viewports (iPhone, Pixel)
 - **Predictable LLM**: Uses the predictable LLM model for deterministic testing
 - **Screenshot capture**: Automatic screenshot generation for visual inspection
-- **Tool testing**: Tests bash tool, think tool, and patch tool interactions
+- **Tool testing**: Tests bash tool, think tool, and edit tool interactions
 - **Multi-browser support**: Tests across Chrome, Firefox, Safari, and mobile variants
 
 ## Running Tests

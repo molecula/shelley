@@ -1,5 +1,37 @@
 import { test, expect } from '@playwright/test';
-import { createConversationViaAPI } from './helpers';
+
+// Create a conversation via the API, wait for the agent to finish
+// (end_of_turn=true means all tool calls completed and final response recorded),
+// then return the conversation slug for direct navigation.
+async function createConversation(
+  request: any,
+  message: string,
+  agentTimeout: number = 30000,
+): Promise<string> {
+  const newResp = await request.post('/api/conversations/new', {
+    data: { message, model: 'predictable', cwd: '/tmp' },
+  });
+  expect(newResp.ok()).toBeTruthy();
+  const { conversation_id } = await newResp.json();
+
+  let slug = '';
+  await expect(async () => {
+    const resp = await request.get(`/api/conversation/${conversation_id}`);
+    const body = await resp.json();
+    // Wait for an agent message with end_of_turn=true — this only appears
+    // after all tool results have been recorded and the model's final
+    // text response is saved.
+    const done = body.messages?.some(
+      (m: { type: string; end_of_turn?: boolean }) =>
+        m.type === 'agent' && m.end_of_turn === true,
+    );
+    expect(done).toBeTruthy();
+    slug = body.conversation?.slug || '';
+    expect(slug).toBeTruthy();
+  }).toPass({ timeout: agentTimeout });
+
+  return slug;
+}
 
 test.describe('Tool Component Verification', () => {
   // Shared smorgasbord conversation (created once, reused by multiple tests).
@@ -9,9 +41,7 @@ test.describe('Tool Component Verification', () => {
 
   async function ensureSmorgasbord(request: any): Promise<string> {
     if (!smorgasbordSlug) {
-      smorgasbordSlug = await createConversationViaAPI(request, 'tool smorgasbord', {
-        agentTimeout: 150000
-      });
+      smorgasbordSlug = await createConversation(request, 'tool smorgasbord', 150000);
     }
     return smorgasbordSlug;
   }
@@ -24,7 +54,11 @@ test.describe('Tool Component Verification', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // All tool results are already in the DB; wait for the UI to render them.
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14, undefined, { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14,
+      undefined,
+      { timeout: 30000 },
+    );
 
     // Verify bash tool uses BashTool component (has bash-tool class)
     const bashTool = page.locator('.bash-tool').first();
@@ -33,14 +67,14 @@ test.describe('Tool Component Verification', () => {
     await expect(bashTool.locator('.bash-tool-command')).toBeVisible();
 
     // Verify thinking content appears (has thinking-content class with 💭 emoji)
-    const thinkingContent = page.locator('.thinking-content').filter({ hasText: "I'm thinking about the best approach" });
+    const thinkingContent = page.locator('.thinking-content').filter({ hasText: 'I\'m thinking about the best approach' });
     await expect(thinkingContent.first()).toBeVisible();
     await expect(thinkingContent.locator('text=💭').first()).toBeVisible();
 
-    // Verify patch tool uses PatchTool component (has patch-tool class)
-    const patchTool = page.locator('.patch-tool').first();
-    await expect(patchTool).toBeVisible();
-    await expect(patchTool.locator('.patch-tool-emoji')).toBeVisible();
+    // Verify edit tool uses PatchTool component (has patch-tool class)
+    const editTool = page.locator('.patch-tool').first();
+    await expect(editTool).toBeVisible();
+    await expect(editTool.locator('.patch-tool-emoji')).toBeVisible();
 
     // Verify screenshot tool uses ScreenshotTool component (has screenshot-tool class)
     const screenshotTool = page.locator('.screenshot-tool').first();
@@ -109,12 +143,16 @@ test.describe('Tool Component Verification', () => {
   });
 
   test('bash tool shows command in header', async ({ page, request }) => {
-    const slug = await createConversationViaAPI(request, 'bash: unique-test-command-xyz123');
+    const slug = await createConversation(request, 'bash: unique-test-command-xyz123');
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for the bash tool to render
-    await page.waitForFunction(() => document.body.textContent?.includes('unique-test-command-xyz123') ?? false, undefined, { timeout: 15000 });
+    await page.waitForFunction(
+      () => document.body.textContent?.includes('unique-test-command-xyz123') ?? false,
+      undefined,
+      { timeout: 15000 },
+    );
 
     // Verify bash tool shows the command in the header (collapsed state)
     const bashToolWithOurCommand = page.locator('.bash-tool').filter({ hasText: 'unique-test-command-xyz123' });
@@ -126,12 +164,16 @@ test.describe('Tool Component Verification', () => {
   });
 
   test('think tool shows thought prefix in header', async ({ page, request }) => {
-    const slug = await createConversationViaAPI(request, 'think: This is a long thought that should be truncated in the header display');
+    const slug = await createConversation(request, 'think: This is a long thought that should be truncated in the header display');
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
     // Wait for the thinking content to render
-    await page.waitForFunction(() => document.body.textContent?.includes("I've considered my approach.") ?? false, undefined, { timeout: 15000 });
+    await page.waitForFunction(
+      () => document.body.textContent?.includes("I've considered my approach.") ?? false,
+      undefined,
+      { timeout: 15000 },
+    );
 
     // Verify thinking content shows the thought text with 💭 emoji
     const thinkingContent = page.locator('.thinking-content').filter({ hasText: 'This is a long thought' }).first();
@@ -147,50 +189,54 @@ test.describe('Tool Component Verification', () => {
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14, undefined, { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14,
+      undefined,
+      { timeout: 30000 },
+    );
 
     // Verify browser_navigate tool shows URL in the header
     const navigateTool = page.locator('.tool').filter({ hasText: 'https://example.com' }).first();
     await expect(navigateTool.locator('.tool-command').filter({ hasText: 'https://example.com' })).toBeVisible();
   });
 
-  test('patch tool can be collapsed and expanded without errors', async ({ page, request }) => {
-    const slug = await createConversationViaAPI(request, 'patch success');
+  test('edit tool can be collapsed and expanded without errors', async ({ page, request }) => {
+    const slug = await createConversation(request, 'edit success');
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for successful patch tool
-    const patchTool = page.locator('.patch-tool[data-testid="tool-call-completed"]').filter({ hasText: 'test-patch-success.txt' }).first();
-    await expect(patchTool).toBeVisible({ timeout: 15000 });
+    // Wait for successful edit tool
+    const editToolEl = page.locator('.patch-tool[data-testid="tool-call-completed"]').filter({ hasText: 'test-patch-success.txt' }).first();
+    await expect(editToolEl).toBeVisible({ timeout: 15000 });
 
     // Get console errors before toggling
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    const header = patchTool.locator('.patch-tool-header');
+    const header = editToolEl.locator('.patch-tool-header');
 
     // The toggle button should exist and respond to clicks
-    const toggle = patchTool.locator('.patch-tool-toggle');
+    const toggle = editToolEl.locator('.patch-tool-toggle');
     await expect(toggle).toBeVisible();
 
     // Click to collapse
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeHidden();
+    await expect(editToolEl.locator('.patch-tool-details')).toBeHidden();
 
     // Expand
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
+    await expect(editToolEl.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
 
     // Collapse again
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeHidden();
+    await expect(editToolEl.locator('.patch-tool-details')).toBeHidden();
 
     // Expand again
     await header.click();
-    await expect(patchTool.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
+    await expect(editToolEl.locator('.patch-tool-details')).toBeVisible({ timeout: 10000 });
 
     // Check no Monaco model errors occurred
-    const modelErrors = errors.filter((e) => e.includes('model') && e.includes('already exists'));
+    const modelErrors = errors.filter(e => e.includes('model') && e.includes('already exists'));
     expect(modelErrors).toHaveLength(0);
   });
 
@@ -201,10 +247,17 @@ test.describe('Tool Component Verification', () => {
     await page.goto(`/c/${slug}`);
     await page.waitForLoadState('domcontentloaded');
 
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14, undefined, { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-testid="tool-call-completed"]').length >= 14,
+      undefined,
+      { timeout: 30000 },
+    );
 
     // Get all tool emojis and check their computed font-size
-    const emojiSizes = await page.$$eval('.tool-emoji, .bash-tool-emoji, .patch-tool-emoji, .screenshot-tool-emoji', (elements) => elements.map((el) => window.getComputedStyle(el).fontSize));
+    const emojiSizes = await page.$$eval(
+      '.tool-emoji, .bash-tool-emoji, .patch-tool-emoji, .screenshot-tool-emoji',
+      (elements) => elements.map(el => window.getComputedStyle(el).fontSize)
+    );
 
     // All emojis should be 1rem (16px by default)
     // Check that all sizes are the same
