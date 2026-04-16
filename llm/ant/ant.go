@@ -29,8 +29,8 @@ const (
 	Claude4Sonnet  = "claude-sonnet-4-20250514"
 	Claude45Opus   = "claude-opus-4-5-20251101"
 	Claude46Opus   = "claude-opus-4-6"
-	Claude46Sonnet = "claude-sonnet-4-6"
 	Claude47Opus   = "claude-opus-4-7"
+	Claude46Sonnet = "claude-sonnet-4-6"
 )
 
 // modelMaxOutputTokens maps model names to their maximum output token limits.
@@ -76,7 +76,16 @@ func ClaudeModelName(userName string) string {
 
 // TokenContextWindow returns the maximum token context window size for this service
 func (s *Service) TokenContextWindow() int {
-	return 200000
+	model := s.Model
+	if model == "" {
+		model = DefaultModel
+	}
+	switch model {
+	case Claude47Opus:
+		return 1000000
+	default:
+		return 200000
+	}
 }
 
 // maxOutputTokens returns the maximum allowed output tokens for the configured model.
@@ -506,7 +515,7 @@ func (s *Service) fromLLMRequest(r *llm.Request) *request {
 		System:     mapped(r.System, fromLLMSystem),
 	}
 
-	// Enable extended thinking if a thinking level is set
+	// Enable thinking if a thinking level is set
 	if s.ThinkingLevel != llm.ThinkingLevelOff {
 		if useAdaptiveThinking(model) {
 			// Opus 4.7+: adaptive thinking with effort level

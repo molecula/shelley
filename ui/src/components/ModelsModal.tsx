@@ -32,6 +32,7 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
 
 const DEFAULT_MODELS: Record<ProviderType, { name: string; model_name: string }[]> = {
   anthropic: [
+    { name: "Claude Opus 4.7", model_name: "claude-opus-4-7" },
     { name: "Claude Sonnet 4.6", model_name: "claude-sonnet-4-6" },
     { name: "Claude Opus 4.6", model_name: "claude-opus-4-6" },
     { name: "Claude Haiku 4.5", model_name: "claude-haiku-4-5" },
