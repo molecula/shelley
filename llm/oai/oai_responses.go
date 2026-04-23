@@ -346,6 +346,8 @@ func (s *ResponsesService) TokenContextWindow() int {
 
 	// Use the same context window logic as the regular service
 	switch model.ModelName {
+	case "gpt-5.5":
+		return 1000000 // 1M context window for gpt-5.5
 	case "gpt-5.4":
 		return 304000 // 304k for gpt-5.4
 	case "gpt-5.3-codex":

@@ -47,7 +47,7 @@ type Model struct {
 }
 
 var (
-	DefaultModel = GPT54
+	DefaultModel = GPT55
 
 	GPT41 = Model{
 		UserName:  "gpt4.1",
@@ -289,6 +289,13 @@ var (
 		APIKeyEnv: OpenAIAPIKeyEnv,
 	}
 
+	GPT55 = Model{
+		UserName:  "gpt-5.5",
+		ModelName: "gpt-5.5",
+		URL:       OpenAIURL,
+		APIKeyEnv: OpenAIAPIKeyEnv,
+	}
+
 	GPT53Codex = Model{
 		UserName:  "gpt-5.3-codex",
 		ModelName: "gpt-5.3-codex",
@@ -326,6 +333,7 @@ var _ llm.Service = (*Service)(nil)
 // Declaration order is display order — keep current models at top, old models at bottom.
 var ModelsRegistry = []Model{
 	// Current OpenAI
+	GPT55,
 	GPT54,
 	GPT5,
 	GPT5Mini,
