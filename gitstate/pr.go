@@ -234,8 +234,6 @@ func toPRInfo(resp ghPRResponse) *PRInfo {
 const prListFields = "number,title,state,url,isDraft,autoMergeRequest,reviewDecision,headRefName"
 
 // fetchRepoPRs fetches PR info for a repo: all open PRs plus recently
-// closed/merged (last 7 days). Returns a map of branch name -> PRInfo.
-// fetchRepoPRs fetches PR info for a repo: all open PRs plus recently
 // closed/merged (last 7 days). Returns a map of branch name -> PRInfo,
 // or nil if either of the two listing calls failed (so the caller can
 // preserve the previously cached entries).
@@ -258,12 +256,14 @@ func fetchRepoPRs(repoRoot string) map[string]*PRInfo {
 	}()
 
 	prs := make(map[string]*PRInfo)
-	for range 2 {
+	for i := range 2 {
 		b := <-ch
 		if !b.ok {
 			slog.Warn("fetchRepoPRs: batch failed", "repo", repoRoot)
 			// Drain the remaining result to avoid goroutine leak, then fail.
-			<-ch
+			if i == 0 {
+				<-ch
+			}
 			return nil
 		}
 		for _, resp := range b.results {
