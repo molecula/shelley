@@ -1,0 +1,13 @@
+[Unit]
+Description=Shelley systemd unit failure notifier (for %i)
+
+[Service]
+Type=oneshot
+# Shared OnFailure= hook for user-scope scheduled Shelley jobs.
+#
+# Usage: in any scheduled unit you want monitored, add
+#   [Unit]
+#   OnFailure=shelley-unit-failure@%n.service
+#
+# Installed by `make install` alongside the shelley-unit-failure script.
+ExecStart=%h/.local/bin/shelley-unit-failure %i

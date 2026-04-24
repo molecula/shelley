@@ -144,6 +144,21 @@ Rebuild and restart:
 make install && systemctl --user restart shelley
 ```
 
+### Scheduled jobs (failure visibility)
+
+`make install` also installs `shelley-unit-failure@.service`, a shared
+`OnFailure=` hook for user-scope timers/services that call `shelley client chat`.
+When a scheduled unit fails, the hook logs to journald, stashes the failing
+unit's recent journal under `~/.local/state/shelley/failures/`, and opens a
+new Shelley conversation describing the failure so you see it in the UI.
+
+Wire it into any scheduled unit you want monitored:
+
+```
+[Unit]
+OnFailure=shelley-unit-failure@%n.service
+```
+
 # Building Shelley
 
 Run `make`. Run `make serve` to start Shelley locally.

@@ -1,0 +1,26 @@
+#!/bin/bash
+# OnFailure= handler invoked by shelley-unit-failure@<name>.service with the
+# failing unit's name as $1. Must never itself fail (noise on noise).
+set +e
+
+unit="$1"
+stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# 1. Loud journal entry. `journalctl --user -p err` surfaces it.
+logger -t shelley-unit-failure -p user.err "$unit failed at $stamp"
+
+# 2. Forensic log: last 50 journal lines of the failing unit.
+mkdir -p "$HOME/.local/state/shelley/failures"
+log="$HOME/.local/state/shelley/failures/${unit}-${stamp}.log"
+journal=$(journalctl --user -u "$unit" -n 50 --no-pager 2>/dev/null | tail -c 4000)
+{
+  echo "=== $unit failed at $stamp UTC ==="
+  echo
+  echo "$journal"
+} > "$log"
+
+# 3. Start a Shelley conversation so the failure is visible in the UI.
+msg=$(printf 'Scheduled systemd unit FAILED: %s at %s UTC. Last 50 journal lines:\n\n%s\n\nPlease summarize the failure and suggest next steps. Do NOT run code or make changes.' "$unit" "$stamp" "$journal")
+"$HOME/.local/bin/shelley" client chat -p "$msg" >/dev/null 2>&1 || true
+
+exit 0
