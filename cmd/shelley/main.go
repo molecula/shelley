@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -425,6 +426,16 @@ func buildLLMConfig(logger *slog.Logger, configPath, terminalURL, defaultModel s
 		DefaultModel:    defaultModel,
 		DB:              database,
 		Logger:          logger,
+	}
+
+	if configPath == "" {
+		if dir, err := os.UserConfigDir(); err == nil {
+			candidate := filepath.Join(dir, "shelley", "shelley.json")
+			if _, err := os.Stat(candidate); err == nil {
+				configPath = candidate
+				logger.Info("Using default config file", "path", configPath)
+			}
+		}
 	}
 
 	if configPath != "" {
