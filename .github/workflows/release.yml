@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Test"]
     branches:
-      - main
+      - molecula
     types:
       - completed
 
@@ -82,7 +82,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
       - name: Resolve headless-shell stable version
         id: headless
