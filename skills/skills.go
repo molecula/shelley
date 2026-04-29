@@ -383,8 +383,11 @@ func expandPath(path string) string {
 	return path
 }
 
-// ProjectSkillsDirs returns all .skills directories found by walking up from
-// the working directory to the git root (or filesystem root if no git root).
+// ProjectSkillsDirs returns all repo-local skill directories found by walking
+// up from the working directory to the git root (or filesystem root if no git
+// root). At each level it looks for both `.skills/` and `.claude/skills/`.
+// Returned dirs are ordered closest-to-working-dir first, so callers can give
+// them precedence over global directories.
 func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 	var dirs []string
 	seen := make(map[string]bool)
@@ -395,11 +398,19 @@ func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 		stopAt = "/"
 	}
 
+	candidates := []string{
+		".skills",
+		filepath.Join(".claude", "skills"),
+	}
+
 	// Walk up from working directory
 	current := workingDir
 	for current != "" {
-		skillsDir := filepath.Join(current, ".skills")
-		if !seen[skillsDir] {
+		for _, rel := range candidates {
+			skillsDir := filepath.Join(current, rel)
+			if seen[skillsDir] {
+				continue
+			}
 			if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
 				dirs = append(dirs, skillsDir)
 				seen[skillsDir] = true
@@ -436,10 +447,21 @@ func ListAll(workingDir, gitRoot string) []Skill {
 		gitRoot = findGitRoot(workingDir)
 	}
 
-	dirs := DefaultDirs()
-	dirs = append(dirs, ProjectSkillsDirs(workingDir, gitRoot)...)
+	// Project-local skills come first so they take precedence over global
+	// skills on name collisions.
+	dirs := ProjectSkillsDirs(workingDir, gitRoot)
+	dirs = append(dirs, DefaultDirs()...)
 
-	all := Discover(dirs)
+	// Dedup by skill name, keeping the first occurrence (highest precedence).
+	var all []Skill
+	seenNames := make(map[string]bool)
+	for _, s := range Discover(dirs) {
+		if seenNames[s.Name] {
+			continue
+		}
+		seenNames[s.Name] = true
+		all = append(all, s)
+	}
 
 	// Collect all skill names claimed on the filesystem (including empty
 	// SKILL.md files that wouldn't survive Parse). A filesystem SKILL.md —
@@ -447,8 +469,8 @@ func ListAll(workingDir, gitRoot string) []Skill {
 	// same name. This lets users suppress a built-in skill by placing an
 	// empty SKILL.md in the matching directory.
 	fsNames := dirSkillNames(dirs)
-	for _, s := range all {
-		fsNames[s.Name] = true
+	for name := range seenNames {
+		fsNames[name] = true
 	}
 
 	for _, s := range BuiltinSkills() {
@@ -468,8 +490,8 @@ func ListAll(workingDir, gitRoot string) []Skill {
 // skill — this lets users delete built-in skills they don't want.
 func FindByName(name, workingDir string) (string, error) {
 	gitRoot := findGitRoot(workingDir)
-	dirs := DefaultDirs()
-	dirs = append(dirs, ProjectSkillsDirs(workingDir, gitRoot)...)
+	dirs := ProjectSkillsDirs(workingDir, gitRoot)
+	dirs = append(dirs, DefaultDirs()...)
 
 	// Filesystem first: check directory-based discovery.
 	for _, s := range Discover(dirs) {

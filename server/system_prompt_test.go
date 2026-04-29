@@ -148,6 +148,38 @@ func TestSystemPromptIncludesSkillsFromAnyWorkingDir(t *testing.T) {
 	}
 }
 
+// TestSystemPromptIncludesClaudeSkills verifies that skills under
+// `.claude/skills/<name>/SKILL.md` in the working directory's repo are
+// surfaced in the system prompt's <available_skills> block.
+func TestSystemPromptIncludesClaudeSkills(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	repoRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillDir := filepath.Join(repoRoot, ".claude", "skills", "docker-images")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: docker-images\ndescription: Build docker images locally.\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prompt, err := GenerateSystemPrompt(repoRoot)
+	if err != nil {
+		t.Fatalf("GenerateSystemPrompt: %v", err)
+	}
+	if !strings.Contains(prompt, "docker-images") {
+		t.Error("system prompt should include docker-images skill from .claude/skills")
+	}
+	if !strings.Contains(prompt, "Build docker images locally.") {
+		t.Error("system prompt should include the .claude/skills skill description")
+	}
+}
+
 func TestSystemPromptAlwaysOnSkills(t *testing.T) {
 	tmpDir := t.TempDir()
 

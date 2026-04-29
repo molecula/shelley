@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,6 +289,15 @@ func skillNames(skills []Skill) []string {
 	return names
 }
 
+func hasName(names []string, want string) bool {
+	for _, n := range names {
+		if n == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestProjectSkillsDirs(t *testing.T) {
 	// Create a directory structure:
 	// tmpDir/
@@ -445,11 +455,11 @@ func TestSkillsFoundRegardlessOfWorkingDir(t *testing.T) {
 
 func TestBuiltinSkills(t *testing.T) {
 	builtins := BuiltinSkills()
-	if len(builtins) != 3 {
-		t.Fatalf("expected exactly 3 built-in skills, got %d: %v", len(builtins), skillNames(builtins))
+	if len(builtins) != 4 {
+		t.Fatalf("expected exactly 4 built-in skills, got %d: %v", len(builtins), skillNames(builtins))
 	}
 
-	wantSkills := []string{"install-node", "previous-conversations", "schedule"}
+	wantSkills := []string{"install-node", "new-conversation", "previous-conversations", "schedule"}
 	for _, wantName := range wantSkills {
 		var found *Skill
 		for i := range builtins {
@@ -683,5 +693,153 @@ Test instructions.
 	}
 	if skills[0].Name != "my-skill" {
 		t.Errorf("skill name = %q, want %q", skills[0].Name, "my-skill")
+	}
+}
+
+
+func TestProjectSkillsDirsIncludesClaudeSkills(t *testing.T) {
+	// tmpDir/
+	//   .claude/skills/skill-a/SKILL.md
+	//   .skills/skill-b/SKILL.md
+	//   subdir/
+	//     .claude/skills/skill-c/SKILL.md
+	//     working/
+	tmpDir := t.TempDir()
+
+	writeSkill := func(dir, name, desc string) {
+		t.Helper()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n", name, desc)
+		if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	writeSkill(filepath.Join(tmpDir, ".claude", "skills", "skill-a"), "skill-a", "A")
+	writeSkill(filepath.Join(tmpDir, ".skills", "skill-b"), "skill-b", "B")
+	writeSkill(filepath.Join(tmpDir, "subdir", ".claude", "skills", "skill-c"), "skill-c", "C")
+
+	workingDir := filepath.Join(tmpDir, "subdir", "working")
+	if err := os.MkdirAll(workingDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	dirs := ProjectSkillsDirs(workingDir, tmpDir)
+
+	want := []string{
+		filepath.Join(tmpDir, "subdir", ".claude", "skills"),
+		filepath.Join(tmpDir, ".skills"),
+		filepath.Join(tmpDir, ".claude", "skills"),
+	}
+	if len(dirs) != len(want) {
+		t.Fatalf("got dirs %v, want %v", dirs, want)
+	}
+	for i, d := range dirs {
+		if d != want[i] {
+			t.Errorf("dirs[%d] = %q, want %q", i, d, want[i])
+		}
+	}
+
+	// And the skills should be discoverable.
+	names := skillNames(Discover(dirs))
+	for _, want := range []string{"skill-a", "skill-b", "skill-c"} {
+		if !hasName(names, want) {
+			t.Errorf("expected %q in discovered skills %v", want, names)
+		}
+	}
+}
+
+func TestListAllRepoLocalOverridesGlobal(t *testing.T) {
+	tmpHome := t.TempDir()
+
+	// Global skill named "shared".
+	globalDir := filepath.Join(tmpHome, ".config", "shelley", "shared")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	globalContent := "---\nname: shared\ndescription: Global version.\n---\n\nGlobal body.\n"
+	if err := os.WriteFile(filepath.Join(globalDir, "SKILL.md"), []byte(globalContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	t.Cleanup(func() { os.Setenv("HOME", oldHome) })
+
+	// Repo-local skill with the same name in .claude/skills.
+	repoRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repoSkillDir := filepath.Join(repoRoot, ".claude", "skills", "shared")
+	if err := os.MkdirAll(repoSkillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repoContent := "---\nname: shared\ndescription: Repo version.\n---\n\nRepo body.\n"
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte(repoContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	all := ListAll(repoRoot, repoRoot)
+
+	var found *Skill
+	for i := range all {
+		if all[i].Name == "shared" {
+			found = &all[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("shared skill not found in %v", skillNames(all))
+	}
+	if found.Description != "Repo version." {
+		t.Errorf("description = %q, want repo version", found.Description)
+	}
+
+	// Only one entry, not duplicated.
+	count := 0
+	for _, s := range all {
+		if s.Name == "shared" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected 1 'shared' skill, got %d", count)
+	}
+
+	// FindByName should return the repo-local body.
+	content, err := FindByName("shared", repoRoot)
+	if err != nil {
+		t.Fatalf("FindByName: %v", err)
+	}
+	if !strings.Contains(content, "Repo body.") {
+		t.Errorf("FindByName returned global body, want repo body: %q", content)
+	}
+}
+
+func TestListAllIncludesClaudeSkills(t *testing.T) {
+	tmpHome := t.TempDir()
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	t.Cleanup(func() { os.Setenv("HOME", oldHome) })
+
+	repoRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(repoRoot, ".claude", "skills", "docker-images")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := "---\nname: docker-images\ndescription: Build docker images.\n---\n\nBody.\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	all := ListAll(repoRoot, repoRoot)
+	if !hasName(skillNames(all), "docker-images") {
+		t.Errorf("expected docker-images in %v", skillNames(all))
 	}
 }
