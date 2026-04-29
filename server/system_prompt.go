@@ -365,10 +365,7 @@ func findSubdirGuidanceFiles(root string) []string {
 // It does NOT walk the entire project tree, since that would pick up application
 // skills (e.g. in pkg/ or assets/) that are not meant for the coding agent.
 func collectSkills(workingDir, gitRoot string) string {
-	dirs := skills.DefaultDirs()
-	dirs = append(dirs, skills.ProjectSkillsDirs(workingDir, gitRoot)...)
-	foundSkills := skills.Discover(dirs)
-	foundSkills = append(foundSkills, skills.BuiltinSkills()...)
+	foundSkills := skills.ListAll(workingDir, gitRoot)
 	return skills.ToPromptXML(foundSkills)
 }
 

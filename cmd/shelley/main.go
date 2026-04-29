@@ -106,10 +106,7 @@ func runSkill(args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: shelley skill cat SKILL_NAME\n")
 			os.Exit(1)
 		}
-		dirs := skills.DefaultDirs()
-		dirs = append(dirs, skills.ProjectSkillsDirs(wd, "")...)
-		all := skills.Discover(dirs)
-		all = append(all, skills.BuiltinSkills()...)
+		all := skills.ListAll(wd, "")
 		var found bool
 		for _, s := range all {
 			if s.Name == args[1] {
@@ -134,10 +131,7 @@ func runSkill(args []string) {
 		}
 
 	case "ls":
-		dirs := skills.DefaultDirs()
-		dirs = append(dirs, skills.ProjectSkillsDirs(wd, "")...)
-		all := skills.Discover(dirs)
-		all = append(all, skills.BuiltinSkills()...)
+		all := skills.ListAll(wd, "")
 		for _, s := range all {
 			fmt.Printf("%s\t%s\n", s.Name, s.Description)
 		}
