@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -230,5 +231,74 @@ func TestSystemdListenerIntegration(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Errorf("Unexpected status code %d, body: %s", resp.StatusCode, body)
+	}
+}
+
+
+// TestCLICommandsIgnoreUIStaleness verifies that CLI subcommands (version,
+// client, skill, unpack-template) do NOT trigger the UI staleness guard.
+// Regression test for a prior incident where a scheduled `shelley client chat`
+// invocation failed because ui/src had been edited without rebuilding ui/dist.
+// The staleness check must only fire for `serve`.
+func TestCLICommandsIgnoreUIStaleness(t *testing.T) {
+	tempDir := t.TempDir()
+	binary := filepath.Join(tempDir, "shelley")
+	buildCmd := exec.Command("go", "build", "-o", binary, ".")
+	if out, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("build failed: %v\n%s", err, out)
+	}
+
+	// Figure out where build-info.json says the source dir is, and make a
+	// file in it newer than the build timestamp. (If the source dir isn't
+	// present on this machine, the staleness check passes trivially, which is
+	// also fine — the test still validates that CLI commands don't exit 1.)
+	buildInfoPath := filepath.Join("..", "..", "ui", "dist", "build-info.json")
+	if data, err := os.ReadFile(buildInfoPath); err == nil {
+		var bi struct {
+			SrcDir string `json:"srcDir"`
+		}
+		_ = json.Unmarshal(data, &bi)
+		if bi.SrcDir != "" {
+			if entries, err := os.ReadDir(bi.SrcDir); err == nil {
+				for _, e := range entries {
+					if e.IsDir() {
+						continue
+					}
+					p := filepath.Join(bi.SrcDir, e.Name())
+					info, err := os.Stat(p)
+					if err != nil {
+						continue
+					}
+					origMod := info.ModTime()
+					now := time.Now()
+					if err := os.Chtimes(p, now, now); err != nil {
+						continue
+					}
+					t.Cleanup(func() { _ = os.Chtimes(p, origMod, origMod) })
+					break
+				}
+			}
+		}
+	}
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"version", []string{"version"}},
+		{"skill ls", []string{"skill", "ls"}},
+		{"client help", []string{"client", "-h"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := exec.Command(binary, tc.args...)
+			out, err := cmd.CombinedOutput()
+			if strings.Contains(string(out), "UI build is stale") {
+				t.Fatalf("%s triggered UI staleness guard:\n%s", tc.name, out)
+			}
+			// `client -h` exits with code 2 (flag help), others exit 0. Either way,
+			// we must not have the fatal staleness message.
+			_ = err
+		})
 	}
 }

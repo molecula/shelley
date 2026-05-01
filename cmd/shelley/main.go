@@ -23,6 +23,7 @@ import (
 	shellslack "shelley.exe.dev/slack"
 	"shelley.exe.dev/templates"
 	"shelley.exe.dev/version"
+	"shelley.exe.dev/ui"
 )
 
 type GlobalConfig struct {
@@ -162,6 +163,11 @@ func runServe(global GlobalConfig, args []string) {
 	requireHeader := fs.String("require-header", "", "Require this header on all API requests (e.g., X-Exedev-Userid)")
 	socketPath := fs.String("socket", client.DefaultSocketPath(), "Path to Unix socket for local CLI client access (set to 'none' to disable)")
 	fs.Parse(args)
+
+	// Only `serve` actually uses the embedded UI, so the staleness check lives
+	// here (not in ui.init()) so scheduled `client` invocations don't break
+	// when a developer edits ui/src without rebuilding.
+	ui.EnforceFreshBuild()
 
 	logger := setupLogging(global.Debug)
 
