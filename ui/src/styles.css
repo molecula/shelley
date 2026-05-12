@@ -3256,7 +3256,60 @@ svg {
   transform: translateX(-50%) scale(0.95);
 }
 
-/* Wrapper for messages area to position scroll-to-bottom button */
+/* Outer row: chat column + diff panel side by side, full height */
+.chat-outer-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* Chat column: header + messages + terminal + status + input */
+.chat-column {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Messages area fills available space inside the chat column */
+.messages-area-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.diff-side-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-base);
+}
+
+.diff-side-panel-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s;
+}
+
+.diff-side-panel-resize-handle:hover {
+  background: var(--primary, #4f9cf9);
+}
+
+.diff-viewer-container-inline {
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
+}
+
 .messages-area-wrapper {
   position: relative;
   flex: 1 1 auto;
@@ -4811,6 +4864,159 @@ svg {
 .diff-viewer-editor {
   height: 100%;
   width: 100%;
+}
+
+/* File accordion list */
+.diff-viewer-file-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-viewer-file-list .diff-viewer-loading,
+.diff-viewer-file-list .diff-viewer-empty {
+  height: 120px;
+  flex-shrink: 0;
+}
+
+.diff-viewer-file-item {
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.diff-viewer-file-item.expanded {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex-shrink: 1;
+}
+
+.diff-viewer-file-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  min-height: 38px;
+  flex-shrink: 0;
+}
+
+.diff-viewer-file-item-header:hover {
+  background: var(--bg-hover);
+}
+
+.diff-viewer-file-item.expanded > .diff-viewer-file-item-header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.diff-viewer-status-badge {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 0.75rem;
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.diff-viewer-status-badge.status-added   { color: #22c55e; }
+.diff-viewer-status-badge.status-deleted { color: #ef4444; }
+.diff-viewer-status-badge.status-modified { color: #f59e0b; }
+
+.diff-viewer-file-item-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.diff-viewer-file-item-name {
+  font-family: monospace;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-viewer-file-item-dir {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diff-viewer-file-item-stats {
+  display: flex;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.diff-viewer-additions { color: #22c55e; }
+.diff-viewer-deletions { color: #ef4444; }
+
+.diff-viewer-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.diff-viewer-chevron.open {
+  transform: rotate(180deg);
+}
+
+.diff-viewer-file-item-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.diff-viewer-file-item-content .diff-viewer-loading {
+  height: 100%;
+}
+
+.diff-viewer-file-item-content .diff-viewer-editor {
+  height: 100%;
+  width: 100%;
+}
+
+/* Slot that receives the (imperatively moved) Monaco editor when its
+   accordion row is expanded. Same sizing rules as the editor itself so
+   Monaco's automaticLayout picks the correct dimensions. */
+.diff-viewer-editor-slot {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Hidden home for the editor when no accordion row is expanded. Kept in
+   the DOM so React never unmounts the editor container; size is zero so
+   it doesn't take layout space. */
+.diff-viewer-editor-home {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 /* Diff viewer line hover highlighting (via decoration API) */
@@ -7838,4 +8044,159 @@ kbd {
   color: var(--text-secondary);
   font-size: 0.875rem;
   font-family: monospace;
+}
+
+/* ── Theme Picker Modal ──────────────────────────────────────────────────── */
+
+.theme-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.theme-picker-modal {
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  width: min(640px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.theme-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.theme-picker-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.theme-picker-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.theme-picker-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.theme-picker-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0.75rem 1.25rem 0;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.theme-picker-tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.theme-picker-tab:hover {
+  color: var(--text-primary);
+}
+
+.theme-picker-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.theme-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.theme-card {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.theme-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+.theme-card.selected {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.theme-card-swatch {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.25rem;
+}
+
+.theme-card-accent {
+  width: 30%;
+  height: 30%;
+  border-radius: 3px;
+}
+
+.theme-card-swatch-default {
+  background: linear-gradient(135deg, var(--bg-secondary) 50%, var(--bg-tertiary) 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.theme-card-name {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
 }

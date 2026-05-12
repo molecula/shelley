@@ -60,14 +60,11 @@ test.describe("Diff viewer find widget", () => {
     const overlay = page.locator(".diff-viewer-overlay");
     await expect(overlay).toBeVisible({ timeout: 10000 });
 
-    // Select the first non-empty commit if working changes are empty.
-    // The diff viewer auto-selects, but we need a file to be loaded.
-    // Wait for a file to appear in the file selector.
-    const fileSelect = overlay.locator("select.diff-viewer-select").nth(1);
-    await expect(async () => {
-      const options = await fileSelect.locator("option").count();
-      expect(options).toBeGreaterThan(1); // more than just the placeholder
-    }).toPass({ timeout: 15000 });
+    // The diff viewer auto-selects the first file, which expands its
+    // accordion row. Wait for that expanded row to appear before checking
+    // Monaco — Monaco is only mounted into the expanded row's slot.
+    const expandedItem = overlay.locator(".diff-viewer-file-item.expanded");
+    await expect(expandedItem).toBeVisible({ timeout: 15000 });
 
     // Wait for Monaco editor to render inside the diff viewer.
     const editorContainer = overlay.locator(".diff-viewer-editor");
