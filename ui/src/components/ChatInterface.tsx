@@ -9,7 +9,17 @@ import {
 } from "../types";
 import { api } from "../services/api";
 import { conversationCache } from "../services/conversationCache";
-import { ThemeMode, getStoredTheme, setStoredTheme, applyTheme } from "../services/theme";
+import {
+  ThemeMode,
+  getStoredTheme,
+  setStoredTheme,
+  applyTheme,
+  getStoredColorThemeId,
+  setStoredColorThemeId,
+  applyColorThemeVars,
+} from "../services/theme";
+import { ColorTheme, getColorThemeById } from "../services/colorThemes";
+import ThemePickerModal from "./ThemePickerModal";
 import { useMarkdown } from "../contexts/MarkdownContext";
 import { useI18n, type Locale, type TranslationKeys } from "../i18n";
 import { setFaviconStatus } from "../services/favicon";
@@ -750,6 +760,11 @@ function ChatInterface({
   // Settings modal removed - configuration moved to status bar for empty conversations
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme);
+  const [colorTheme, setColorTheme] = useState<ColorTheme | null>(() => {
+    const id = getStoredColorThemeId();
+    return id ? (getColorThemeById(id) ?? null) : null;
+  });
+  const [showThemePicker, setShowThemePicker] = useState(false);
   const { markdownMode, setMarkdownMode } = useMarkdown();
   const { t, locale, setLocale } = useI18n();
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -760,6 +775,17 @@ function ChatInterface({
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+  // Apply stored color theme on mount and whenever it changes
+  useEffect(() => {
+    applyColorThemeVars(colorTheme?.cssVars ?? null);
+  }, [colorTheme]);
+
+  const handleSelectColorTheme = useCallback((theme: ColorTheme | null) => {
+    setColorTheme(theme);
+    setStoredColorThemeId(theme?.id ?? null);
+    applyColorThemeVars(theme?.cssVars ?? null);
+  }, []);
+
   const [browserNotifsEnabled, setBrowserNotifsEnabled] = useState(() =>
     isChannelEnabled("browser"),
   );
@@ -769,6 +795,12 @@ function ChatInterface({
   );
   const [diffViewerCwd, setDiffViewerCwd] = useState<string | undefined>(undefined);
   const [diffCommentText, setDiffCommentText] = useState("");
+  const [showDiffSidePanel, setShowDiffSidePanel] = useState(false);
+  const [diffSidePanelWidth, setDiffSidePanelWidth] = useState(50); // percentage of chat body row
+  const diffSidePanelResizingRef = useRef(false);
+  const diffSidePanelStartXRef = useRef(0);
+  const diffSidePanelStartWidthRef = useRef(0);
+  const chatBodyRowRef = useRef<HTMLDivElement>(null);
   const [agentWorking, setAgentWorking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [contextWindowSize, setContextWindowSize] = useState(0);
@@ -828,6 +860,32 @@ function ChatInterface({
     setDiffViewerCwd(cwd);
     setShowDiffViewer(true);
   }, []);
+
+  const handleDiffPanelResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      diffSidePanelResizingRef.current = true;
+      diffSidePanelStartXRef.current = e.clientX;
+      diffSidePanelStartWidthRef.current = diffSidePanelWidth;
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!diffSidePanelResizingRef.current) return;
+        const containerWidth = chatBodyRowRef.current?.offsetWidth || window.innerWidth;
+        const deltaPct = ((diffSidePanelStartXRef.current - e.clientX) / containerWidth) * 100;
+        setDiffSidePanelWidth(Math.max(15, Math.min(85, diffSidePanelStartWidthRef.current + deltaPct)));
+      };
+
+      const handleMouseUp = () => {
+        diffSidePanelResizingRef.current = false;
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [diffSidePanelWidth],
+  );
 
   // Navigate to next/previous user message when trigger changes
   useEffect(() => {
@@ -1966,6 +2024,9 @@ function ChatInterface({
 
   return (
     <div className="full-height flex flex-col">
+      {/* Outer row: chat column + full-height diff panel */}
+      <div className="chat-outer-row" ref={chatBodyRowRef}>
+      <div className="chat-column">
       {/* Header */}
       <div className="header">
         <div className="header-left">
@@ -2046,12 +2107,15 @@ function ChatInterface({
 
             {showOverflowMenu && (
               <div className="overflow-menu">
-                {/* Diffs button - show when we have a CWD */}
+                {/* Diffs toggle - show when we have a CWD */}
                 {(currentConversation?.cwd || selectedCwd) && (
                   <button
                     onClick={() => {
                       setShowOverflowMenu(false);
-                      setShowDiffViewer(true);
+                      setShowDiffSidePanel((prev) => {
+                        if (!prev) setDiffSidePanelWidth(50);
+                        return !prev;
+                      });
                     }}
                     className="overflow-menu-item"
                   >
@@ -2065,10 +2129,10 @@ function ChatInterface({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4M9 3h10a2 2 0 012 2v14a2 2 0 01-2 2H9M9 3v18"
                       />
                     </svg>
-                    {t("diffs")}
+                    {showDiffSidePanel ? "Hide Diffs" : "Show Diffs"}
                   </button>
                 )}
                 {terminalURL && (
@@ -2243,6 +2307,21 @@ function ChatInterface({
                   </button>
                 </div>
 
+                {/* Color theme picker */}
+                <button
+                  className="overflow-menu-item"
+                  onClick={() => setShowThemePicker(true)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                  </svg>
+                  Color Theme{colorTheme ? `: ${colorTheme.name}` : ""}
+                </button>
+
                 {/* Browser notifications toggle */}
                 {typeof Notification !== "undefined" && (
                   <>
@@ -2348,7 +2427,6 @@ function ChatInterface({
       </div>
 
       {/* Messages area */}
-      {/* Messages area with scroll-to-bottom button wrapper */}
       <div className="messages-area-wrapper">
         <div className="messages-container scrollable" ref={messagesContainerRef}>
           {loading ? (
@@ -2425,6 +2503,7 @@ function ChatInterface({
         )}
       </div>
 
+
       {/* Terminal Panel - between messages and status bar */}
       <TerminalPanel
         terminals={ephemeralTerminals}
@@ -2467,6 +2546,30 @@ function ChatInterface({
           statusSlot={conversationId && isMobile ? renderStatusContent() : undefined}
         />
       )}
+      </div>{/* end chat-column */}
+
+      {/* Diff side panel — full page height */}
+      {showDiffSidePanel && (
+        <>
+          <div
+            className="diff-side-panel-resize-handle"
+            onMouseDown={handleDiffPanelResizeMouseDown}
+          />
+          <div className="diff-side-panel" style={{ width: `${diffSidePanelWidth}%` }}>
+            <DiffViewer
+              inline
+              cwd={diffViewerCwd || currentConversation?.cwd || selectedCwd || ""}
+              isOpen
+              onClose={() => setShowDiffSidePanel(false)}
+              onCommentTextChange={setDiffCommentText}
+              initialCommit={diffViewerInitialCommit}
+              onCwdChange={setDiffViewerCwd}
+              colorTheme={colorTheme}
+            />
+          </div>
+        </>
+      )}
+      </div>{/* end chat-outer-row */}
 
       {/* Directory Picker Modal */}
       <DirectoryPickerModal
@@ -2491,7 +2594,17 @@ function ChatInterface({
         onCommentTextChange={setDiffCommentText}
         initialCommit={diffViewerInitialCommit}
         onCwdChange={setDiffViewerCwd}
+        colorTheme={colorTheme}
       />
+
+      {/* Color Theme Picker */}
+      {showThemePicker && (
+        <ThemePickerModal
+          currentThemeId={colorTheme?.id ?? null}
+          onSelect={handleSelectColorTheme}
+          onClose={() => setShowThemePicker(false)}
+        />
+      )}
 
       {/* Version Checker Modal */}
       {VersionModal}
