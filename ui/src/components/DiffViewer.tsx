@@ -3,6 +3,7 @@ import type * as Monaco from "monaco-editor";
 import { api } from "../services/api";
 import { loadMonaco } from "../services/monaco";
 import { isDarkModeActive } from "../services/theme";
+import { ColorTheme, defineAllMonacoThemes } from "../services/colorThemes";
 import { GitDiffInfo, GitFileInfo, GitFileDiff, GitCommitMessage } from "../types";
 import DirectoryPickerModal from "./DirectoryPickerModal";
 
@@ -13,6 +14,8 @@ interface DiffViewerProps {
   onCommentTextChange: (text: string) => void;
   initialCommit?: string; // If set, select this commit when opening
   onCwdChange?: (cwd: string) => void; // Called when user picks a different git directory
+  inline?: boolean; // Render as inline side panel instead of modal overlay
+  colorTheme?: ColorTheme | null; // Active color theme, null = default
 }
 
 // Icon components for cleaner JSX
@@ -74,6 +77,8 @@ function DiffViewer({
   onCommentTextChange,
   initialCommit,
   onCwdChange,
+  inline = false,
+  colorTheme,
 }: DiffViewerProps) {
   const [diffs, setDiffs] = useState<GitDiffInfo[]>([]);
   const [gitRoot, setGitRoot] = useState<string | null>(null);
@@ -164,6 +169,7 @@ function DiffViewer({
       loadMonaco()
         .then((monaco) => {
           monacoRef.current = monaco;
+          defineAllMonacoThemes(monaco);
           setMonacoLoaded(true);
         })
         .catch((err) => {
@@ -252,34 +258,69 @@ function DiffViewer({
 
     const monaco = monacoRef.current;
 
-    // Initial readOnly just needs to be safe-by-default; the model-swap
-    // effect (which runs right after this one) sets the correct value based
-    // on file type (commit message vs regular file) and current mode.
-    const initMobile = isMobileRef.current;
+    // Dispose previous editor
+    if (editorRef.current) {
+      editorRef.current.dispose();
+      editorRef.current = null;
+    }
+
+    // Get language from file extension
+    const ext = "." + (fileDiff.path.split(".").pop()?.toLowerCase() || "");
+    const languages = monaco.languages.getLanguages();
+    let language = "plaintext";
+    for (const lang of languages) {
+      if (lang.extensions?.includes(ext)) {
+        language = lang.id;
+        break;
+      }
+    }
+
+    // Create models with unique URIs (include timestamp to avoid conflicts)
+    const timestamp = Date.now();
+    const originalUri = monaco.Uri.file(`original-${timestamp}-${fileDiff.path}`);
+    const modifiedUri = monaco.Uri.file(`modified-${timestamp}-${fileDiff.path}`);
+
+    const originalModel = monaco.editor.createModel(fileDiff.oldContent, language, originalUri);
+    const modifiedModel = monaco.editor.createModel(fileDiff.newContent, language, modifiedUri);
+
+    // Create diff editor with mobile-friendly options
+    // Do not set `theme` here — Monaco's theme is a global singleton and this
+    // option would call setTheme() internally, overriding the color theme effect.
     const diffEditor = monaco.editor.createDiffEditor(editorContainerRef.current, {
-      theme: isDarkModeActive() ? "vs-dark" : "vs",
+      fontSize: 14,
       readOnly: true,
       originalEditable: false,
       automaticLayout: true,
-      renderSideBySide: !initMobile,
+      renderSideBySide: !isMobile,
       enableSplitViewResizing: true,
       renderIndicators: true,
       renderMarginRevertIcon: false,
-      lineNumbers: initMobile ? "off" : "on",
+      lineNumbers: isMobile ? "off" : "on",
       minimap: { enabled: false },
-      scrollBeyondLastLine: true, // Enable scroll past end for mobile floating buttons
+      scrollBeyondLastLine: false,
       wordWrap: "on",
-      glyphMargin: !initMobile, // Enable glyph margin for comment indicator on hover
-      lineDecorationsWidth: initMobile ? 0 : 10,
-      lineNumbersMinChars: initMobile ? 0 : 3,
+      glyphMargin: !isMobile,
+      lineDecorationsWidth: isMobile ? 0 : 10,
+      lineNumbersMinChars: isMobile ? 0 : 3,
       quickSuggestions: false,
       suggestOnTriggerCharacters: false,
       lightbulb: { enabled: false },
       codeLens: false,
       contextmenu: false,
       links: false,
-      folding: !initMobile,
-      padding: initMobile ? { bottom: 80 } : undefined, // Extra padding for floating buttons on mobile
+      folding: !isMobile,
+      padding: isMobile ? { bottom: 80 } : undefined,
+      hideUnchangedRegions: {
+        enabled: true,
+        contextLineCount: 3,
+        minimumLineCount: 3,
+        revealLineCount: 20,
+      },
+    });
+
+    diffEditor.setModel({
+      original: originalModel,
+      modified: modifiedModel,
     });
 
     editorRef.current = diffEditor;
@@ -843,16 +884,22 @@ function DiffViewer({
     saveCurrentFile();
   }, [saveCurrentFile]);
 
-  // Update Monaco theme when dark mode changes
+  // Update Monaco theme when dark mode or color theme changes
   useEffect(() => {
     if (!monacoRef.current) return;
 
     const updateMonacoTheme = () => {
-      const theme = isDarkModeActive() ? "vs-dark" : "vs";
-      monacoRef.current?.editor.setTheme(theme);
+      if (colorTheme) {
+        monacoRef.current?.editor.setTheme(colorTheme.monacoTheme);
+      } else {
+        const theme = isDarkModeActive() ? "vs-dark" : "vs";
+        monacoRef.current?.editor.setTheme(theme);
+      }
     };
 
-    // Watch for changes to the dark class on documentElement
+    updateMonacoTheme();
+
+    // Watch for changes to the dark class on documentElement (only matters when no color theme)
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.attributeName === "class") {
@@ -864,7 +911,7 @@ function DiffViewer({
     observer.observe(document.documentElement, { attributes: true });
 
     return () => observer.disconnect();
-  }, [monacoLoaded]);
+  }, [monacoLoaded, colorTheme]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1128,9 +1175,9 @@ function DiffViewer({
     </button>
   );
 
-  return (
-    <div className="diff-viewer-overlay">
-      <div className="diff-viewer-container">
+  const containerContent = (
+    <>
+    <div className={`diff-viewer-container${inline ? " diff-viewer-container-inline" : ""}`}>
         {/* Toast notification */}
         {saveStatus !== "idle" && (
           <div className={`diff-viewer-toast diff-viewer-toast-${saveStatus}`}>
@@ -1148,78 +1195,137 @@ function DiffViewer({
         )}
         {showKeyboardHint && (
           <div className="diff-viewer-toast diff-viewer-toast-hint">
-            ⌨️ Use . , for next/prev change, &lt; &gt; for files
+            ⌨️ Use . , for next/prev change
           </div>
         )}
 
-        {/* Header - different layout for desktop vs mobile */}
-        {isMobile ? (
-          // Mobile header: just selectors 50/50
-          <div className="diff-viewer-header diff-viewer-header-mobile">
-            <div className="diff-viewer-mobile-selectors">
+        {/* Header */}
+        <div className="diff-viewer-header">
+          <div className="diff-viewer-header-row">
+            <div className="diff-viewer-selectors-row">
               {commitSelector}
-              {fileSelector}
             </div>
-            {dirButton}
-            <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
-              ×
-            </button>
-          </div>
-        ) : (
-          // Desktop header: selectors expand, controls on right
-          <div className="diff-viewer-header">
-            <div className="diff-viewer-header-row">
-              <div className="diff-viewer-selectors-row">
-                {commitSelector}
-                {fileSelector}
-              </div>
-              <div className="diff-viewer-controls-row">
-                {navButtons}
-                {modeToggle}
-                {dirButton}
-                <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
-                  ×
+            <div className="diff-viewer-controls-row">
+              <div className="diff-viewer-nav-buttons">
+                <button
+                  className="diff-viewer-nav-btn"
+                  onClick={goToPreviousChange}
+                  disabled={!fileDiff}
+                  title="Previous change (,)"
+                >
+                  <PrevChangeIcon />
+                </button>
+                <button
+                  className="diff-viewer-nav-btn"
+                  onClick={goToNextChange}
+                  disabled={!fileDiff}
+                  title="Next change (.)"
+                >
+                  <NextChangeIcon />
                 </button>
               </div>
+              {modeToggle}
+              {dirButton}
+              <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
+                ×
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Error banner */}
         {error && <div className="diff-viewer-error">{error}</div>}
 
-        {/* Main content */}
-        <div className="diff-viewer-content">
-          {loading && !fileDiff && (
+        {/* File accordion list */}
+        <div className="diff-viewer-file-list">
+          {loading && files.length === 0 && (
             <div className="diff-viewer-loading">
               <div className="spinner"></div>
               <span>Loading...</span>
             </div>
           )}
-
-          {!loading && !monacoLoaded && !error && (
+          {!loading && !monacoLoaded && !error && files.length === 0 && (
             <div className="diff-viewer-loading">
               <div className="spinner"></div>
               <span>Loading editor...</span>
             </div>
           )}
-
-          {!loading && monacoLoaded && !fileDiff && !error && (
+          {!loading && monacoLoaded && files.length === 0 && !error && (
             <div className="diff-viewer-empty">
-              <p>Select a diff and file to view changes.</p>
-              <p className="diff-viewer-hint">Click on line numbers to add comments.</p>
+              <p>{selectedDiff ? "No files changed." : "Select a diff to view changes."}</p>
+              <p className="diff-viewer-hint">Click on lines to add comments.</p>
             </div>
           )}
 
-          {/* Monaco editor container */}
-          <div
-            ref={editorContainerRef}
-            className="diff-viewer-editor"
-            style={{ display: fileDiff && monacoLoaded ? "block" : "none" }}
-          />
+          {files.map((file) => {
+            const isExpanded = selectedFile === file.path;
+            const filename = file.path.split("/").pop() || file.path;
+            const dir = file.path.includes("/")
+              ? file.path.slice(0, file.path.lastIndexOf("/") + 1)
+              : "";
+
+            return (
+              <div
+                key={file.path}
+                className={`diff-viewer-file-item${isExpanded ? " expanded" : ""}`}
+              >
+                <button
+                  className="diff-viewer-file-item-header"
+                  onClick={() => setSelectedFile(isExpanded ? null : file.path)}
+                >
+                  <span className={`diff-viewer-status-badge status-${file.status}`}>
+                    {getStatusSymbol(file.status)}
+                  </span>
+                  <span className="diff-viewer-file-item-names">
+                    <span className="diff-viewer-file-item-name" title={file.path}>
+                      {filename}
+                    </span>
+                    {dir && (
+                      <span className="diff-viewer-file-item-dir" title={file.path}>
+                        {dir}
+                      </span>
+                    )}
+                  </span>
+                  <span className="diff-viewer-file-item-stats">
+                    {file.additions > 0 && (
+                      <span className="diff-viewer-additions">+{file.additions}</span>
+                    )}
+                    {file.deletions > 0 && (
+                      <span className="diff-viewer-deletions">-{file.deletions}</span>
+                    )}
+                  </span>
+                  <svg
+                    className={`diff-viewer-chevron${isExpanded ? " open" : ""}`}
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 6l4 4 4-4" />
+                  </svg>
+                </button>
+                {isExpanded && (
+                  <div className="diff-viewer-file-item-content">
+                    {(loading && !fileDiff) || (!monacoLoaded && !error) ? (
+                      <div className="diff-viewer-loading">
+                        <div className="spinner"></div>
+                      </div>
+                    ) : null}
+                    <div
+                      ref={editorContainerRef}
+                      className="diff-viewer-editor"
+                      style={{ display: fileDiff && monacoLoaded ? "block" : "none" }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Mobile floating nav buttons at bottom */}
+        {/* Mobile floating change nav */}
         {isMobile && (
           <div className="diff-viewer-mobile-nav">
             <button
@@ -1230,14 +1336,6 @@ function DiffViewer({
               }
             >
               {mode === "comment" ? "💬" : "✏️"}
-            </button>
-            <button
-              className="diff-viewer-mobile-nav-btn"
-              onClick={goToPreviousFile}
-              disabled={!hasPrevFile}
-              title="Previous file (<)"
-            >
-              <PrevFileIcon />
             </button>
             <button
               className="diff-viewer-mobile-nav-btn"
@@ -1254,14 +1352,6 @@ function DiffViewer({
               title="Next change (.)"
             >
               <NextChangeIcon />
-            </button>
-            <button
-              className="diff-viewer-mobile-nav-btn"
-              onClick={() => goToNextFile()}
-              disabled={!hasNextFile}
-              title="Next file (>)"
-            >
-              <NextFileIcon />
             </button>
           </div>
         )}
@@ -1317,8 +1407,14 @@ function DiffViewer({
         initialPath={cwd}
         foldersOnly
       />
-    </div>
+    </>
   );
+
+  if (inline) {
+    return containerContent;
+  }
+
+  return <div className="diff-viewer-overlay">{containerContent}</div>;
 }
 
 export default DiffViewer;
