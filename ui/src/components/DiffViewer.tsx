@@ -1199,39 +1199,36 @@ function DiffViewer({
           </div>
         )}
 
-        {/* Header */}
-        <div className="diff-viewer-header">
-          <div className="diff-viewer-header-row">
-            <div className="diff-viewer-selectors-row">
+        {/* Header - different layout for desktop vs mobile */}
+        {isMobile ? (
+          <div className="diff-viewer-header diff-viewer-header-mobile">
+            <div className="diff-viewer-mobile-selectors">
               {commitSelector}
+              {fileSelector}
             </div>
-            <div className="diff-viewer-controls-row">
-              <div className="diff-viewer-nav-buttons">
-                <button
-                  className="diff-viewer-nav-btn"
-                  onClick={goToPreviousChange}
-                  disabled={!fileDiff}
-                  title="Previous change (,)"
-                >
-                  <PrevChangeIcon />
-                </button>
-                <button
-                  className="diff-viewer-nav-btn"
-                  onClick={goToNextChange}
-                  disabled={!fileDiff}
-                  title="Next change (.)"
-                >
-                  <NextChangeIcon />
+            {dirButton}
+            <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
+              ×
+            </button>
+          </div>
+        ) : (
+          <div className="diff-viewer-header">
+            <div className="diff-viewer-header-row">
+              <div className="diff-viewer-selectors-row">
+                {commitSelector}
+                {fileSelector}
+              </div>
+              <div className="diff-viewer-controls-row">
+                {navButtons}
+                {modeToggle}
+                {dirButton}
+                <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
+                  ×
                 </button>
               </div>
-              {modeToggle}
-              {dirButton}
-              <button className="diff-viewer-close" onClick={onClose} title="Close (Esc)">
-                ×
-              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Error banner */}
         {error && <div className="diff-viewer-error">{error}</div>}

@@ -972,11 +972,21 @@ function ChatInterface({
   );
   const [diffViewerCwd, setDiffViewerCwd] = useState<string | undefined>(undefined);
   const [diffCommentText, setDiffCommentText] = useState("");
-  const [showDiffSidePanel, setShowDiffSidePanel] = useState(false);
-  const [diffSidePanelWidth, setDiffSidePanelWidth] = useState(50); // percentage of chat body row
+  const [showDiffSidePanel, setShowDiffSidePanel] = useState(
+    () => localStorage.getItem("diffSidePanelOpen") === "true",
+  );
+  const [diffSidePanelWidth, setDiffSidePanelWidth] = useState(
+    () => parseFloat(localStorage.getItem("diffSidePanelWidth") || "50"),
+  );
   const diffSidePanelResizingRef = useRef(false);
   const diffSidePanelStartXRef = useRef(0);
   const diffSidePanelStartWidthRef = useRef(0);
+  useEffect(() => {
+    localStorage.setItem("diffSidePanelOpen", String(showDiffSidePanel));
+  }, [showDiffSidePanel]);
+  useEffect(() => {
+    localStorage.setItem("diffSidePanelWidth", String(diffSidePanelWidth));
+  }, [diffSidePanelWidth]);
   const chatBodyRowRef = useRef<HTMLDivElement>(null);
   const [agentWorking, setAgentWorking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
