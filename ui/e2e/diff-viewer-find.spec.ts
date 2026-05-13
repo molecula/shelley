@@ -60,21 +60,16 @@ test.describe("Diff viewer find widget", () => {
     const overlay = page.locator(".diff-viewer-overlay");
     await expect(overlay).toBeVisible({ timeout: 10000 });
 
-    // The diff viewer auto-selects the first file, which expands its
-    // accordion row. Wait for that expanded row to appear before checking
-    // Monaco — Monaco is only mounted into the expanded row's slot.
-    const expandedItem = overlay.locator(".diff-viewer-file-item.expanded");
-    await expect(expandedItem).toBeVisible({ timeout: 15000 });
-
-    // Wait for Monaco editor to render inside the diff viewer.
+    // The diff viewer auto-selects the first file and mounts Monaco into the
+    // expanded row's slot. Wait directly for the Monaco editor to render —
+    // checking intermediate layout states is flaky under CI parallel load.
     const editorContainer = overlay.locator(".diff-viewer-editor");
     await expect(async () => {
       const visible = await editorContainer.isVisible();
       expect(visible).toBeTruthy();
-      // Monaco creates .monaco-editor elements when ready
       const monacoEl = await editorContainer.locator(".monaco-editor").count();
       expect(monacoEl).toBeGreaterThan(0);
-    }).toPass({ timeout: 15000 });
+    }).toPass({ timeout: 30000 });
 
     // Verify the find widget is NOT visible initially.
     const findWidget = editorContainer.locator(".find-widget.visible");

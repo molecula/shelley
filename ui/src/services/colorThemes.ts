@@ -1,6 +1,26 @@
 import type * as Monaco from "monaco-editor";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import draculaData from "monaco-themes/themes/Dracula.json";
+import nightOwlData from "monaco-themes/themes/Night Owl.json";
+import monokaiData from "monaco-themes/themes/Monokai.json";
+import tomorrowNightData from "monaco-themes/themes/Tomorrow-Night.json";
+import oceanicNextData from "monaco-themes/themes/Oceanic Next.json";
+import cobalt2Data from "monaco-themes/themes/Cobalt2.json";
+import solarizedDarkData from "monaco-themes/themes/Solarized-dark.json";
+import githubDarkData from "monaco-themes/themes/GitHub Dark.json";
+import tomorrowNightEightiesData from "monaco-themes/themes/Tomorrow-Night-Eighties.json";
+import merbivoreData from "monaco-themes/themes/Merbivore Soft.json";
+import githubLightData from "monaco-themes/themes/GitHub Light.json";
+import solarizedLightData from "monaco-themes/themes/Solarized-light.json";
+import tomorrowData from "monaco-themes/themes/Tomorrow.json";
+import xcodeData from "monaco-themes/themes/Xcode_default.json";
+import textmateData from "monaco-themes/themes/Textmate (Mac Classic).json";
+import dawnData from "monaco-themes/themes/Dawn.json";
+import cloudsData from "monaco-themes/themes/Clouds.json";
+import iPlasticData from "monaco-themes/themes/iPlastic.json";
+import kuroirData from "monaco-themes/themes/Kuroir Theme.json";
+import dreamweaverData from "monaco-themes/themes/Dreamweaver.json";
+
 type MonacoThemeData = Monaco.editor.IStandaloneThemeData;
 
 export interface ColorTheme {
@@ -8,58 +28,11 @@ export interface ColorTheme {
   name: string;
   type: "dark" | "light";
   monacoTheme: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  themeData: any; // null = built-in Monaco theme, no defineTheme needed
+  themeData: MonacoThemeData | null; // null = built-in Monaco theme, no defineTheme needed
   cssVars: Record<string, string>;
   previewBg: string;
   previewAccent: string;
 }
-
-// ─── Dark themes ────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const draculaData = require("monaco-themes/themes/Dracula.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const nightOwlData = require("monaco-themes/themes/Night Owl.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const monokaiData = require("monaco-themes/themes/Monokai.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tomorrowNightData = require("monaco-themes/themes/Tomorrow-Night.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const oceanicNextData = require("monaco-themes/themes/Oceanic Next.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const cobalt2Data = require("monaco-themes/themes/Cobalt2.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const solarizedDarkData = require("monaco-themes/themes/Solarized-dark.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const githubDarkData = require("monaco-themes/themes/GitHub Dark.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tomorrowNightEightiesData = require("monaco-themes/themes/Tomorrow-Night-Eighties.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const merbivoreData = require("monaco-themes/themes/Merbivore Soft.json") as MonacoThemeData;
-
-// ─── Light themes ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const githubLightData = require("monaco-themes/themes/GitHub Light.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const solarizedLightData = require("monaco-themes/themes/Solarized-light.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const tomorrowData = require("monaco-themes/themes/Tomorrow.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const xcodeData = require("monaco-themes/themes/Xcode_default.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const textmateData = require("monaco-themes/themes/Textmate (Mac Classic).json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const dawnData = require("monaco-themes/themes/Dawn.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const cloudsData = require("monaco-themes/themes/Clouds.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const iPlasticData = require("monaco-themes/themes/iPlastic.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const kuroirData = require("monaco-themes/themes/Kuroir Theme.json") as MonacoThemeData;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const dreamweaverData = require("monaco-themes/themes/Dreamweaver.json") as MonacoThemeData;
 
 // ─── Dark theme definitions ──────────────────────────────────────────────────
 
