@@ -60,14 +60,25 @@ test.describe("Diff viewer find widget", () => {
     const overlay = page.locator(".diff-viewer-overlay");
     await expect(overlay).toBeVisible({ timeout: 10000 });
 
-    // The diff viewer should load the file list and auto-expand the first file,
-    // but on small viewports (e.g. Mobile Chrome) the first file isn't always
-    // expanded by the time the overlay becomes visible. Tap the first file
-    // header explicitly if nothing is expanded yet.
-    const firstFile = overlay.locator(".diff-viewer-file-item").first();
-    await expect(firstFile).toBeVisible({ timeout: 10000 });
-    if (!(await firstFile.evaluate((el) => el.classList.contains("expanded")))) {
-      await firstFile.locator(".diff-viewer-file-item-header").click();
+    // When the diff viewer falls back to the most recent commit (clean tree in
+    // CI), it prepends a synthetic "commit-message:" pseudo-file and auto-
+    // selects it. That pseudo-file does NOT mount Monaco, so the find widget
+    // would never appear. Pick the first real (non-commit-message) file by
+    // filtering on the header text — the parent .diff-viewer-file-item also
+    // contains the expanded Monaco content, which can spuriously match if the
+    // currently-shown file happens to contain the filter string. With a dirty
+    // tree (working changes), there are no commit-message entries and the
+    // first real file is already expanded — the guard skips the click then.
+    const firstRealFileHeader = overlay
+      .locator(".diff-viewer-file-item-header")
+      .filter({ hasNotText: /commit-message:/ })
+      .first();
+    await expect(firstRealFileHeader).toBeVisible({ timeout: 10000 });
+    const alreadyExpanded = await firstRealFileHeader.evaluate(
+      (el) => el.parentElement?.classList.contains("expanded") ?? false,
+    );
+    if (!alreadyExpanded) {
+      await firstRealFileHeader.click();
     }
 
     // Now wait for the Monaco editor to render inside the expanded row's slot.
