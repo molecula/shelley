@@ -60,9 +60,17 @@ test.describe("Diff viewer find widget", () => {
     const overlay = page.locator(".diff-viewer-overlay");
     await expect(overlay).toBeVisible({ timeout: 10000 });
 
-    // The diff viewer auto-selects the first file and mounts Monaco into the
-    // expanded row's slot. Wait directly for the Monaco editor to render —
-    // checking intermediate layout states is flaky under CI parallel load.
+    // The diff viewer should load the file list and auto-expand the first file,
+    // but on small viewports (e.g. Mobile Chrome) the first file isn't always
+    // expanded by the time the overlay becomes visible. Tap the first file
+    // header explicitly if nothing is expanded yet.
+    const firstFile = overlay.locator(".diff-viewer-file-item").first();
+    await expect(firstFile).toBeVisible({ timeout: 10000 });
+    if (!(await firstFile.evaluate((el) => el.classList.contains("expanded")))) {
+      await firstFile.locator(".diff-viewer-file-item-header").click();
+    }
+
+    // Now wait for the Monaco editor to render inside the expanded row's slot.
     const editorContainer = overlay.locator(".diff-viewer-editor");
     await expect(async () => {
       const visible = await editorContainer.isVisible();
