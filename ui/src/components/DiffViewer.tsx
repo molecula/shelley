@@ -1233,96 +1233,37 @@ function DiffViewer({
         {/* Error banner */}
         {error && <div className="diff-viewer-error">{error}</div>}
 
-        {/* File accordion list */}
-        <div className="diff-viewer-file-list">
-          {loading && files.length === 0 && (
+        {/* Main content */}
+        <div className="diff-viewer-content">
+          {loading && !fileDiff && (
             <div className="diff-viewer-loading">
               <div className="spinner"></div>
               <span>Loading...</span>
             </div>
           )}
-          {!loading && !monacoLoaded && !error && files.length === 0 && (
+
+          {!loading && !monacoLoaded && !error && (
             <div className="diff-viewer-loading">
               <div className="spinner"></div>
               <span>Loading editor...</span>
             </div>
           )}
-          {!loading && monacoLoaded && files.length === 0 && !error && (
+
+          {!loading && monacoLoaded && !fileDiff && !error && (
             <div className="diff-viewer-empty">
-              <p>{selectedDiff ? "No files changed." : "Select a diff to view changes."}</p>
-              <p className="diff-viewer-hint">Click on lines to add comments.</p>
+              <p>{selectedDiff ? "No files changed." : "Select a diff and file to view changes."}</p>
+              <p className="diff-viewer-hint">Click on line numbers to add comments.</p>
             </div>
           )}
 
-          {files.map((file) => {
-            const isExpanded = selectedFile === file.path;
-            const filename = file.path.split("/").pop() || file.path;
-            const dir = file.path.includes("/")
-              ? file.path.slice(0, file.path.lastIndexOf("/") + 1)
-              : "";
-
-            return (
-              <div
-                key={file.path}
-                className={`diff-viewer-file-item${isExpanded ? " expanded" : ""}`}
-              >
-                <button
-                  className="diff-viewer-file-item-header"
-                  onClick={() => setSelectedFile(isExpanded ? null : file.path)}
-                >
-                  <span className={`diff-viewer-status-badge status-${file.status}`}>
-                    {getStatusSymbol(file.status)}
-                  </span>
-                  <span className="diff-viewer-file-item-names">
-                    <span className="diff-viewer-file-item-name" title={file.path}>
-                      {filename}
-                    </span>
-                    {dir && (
-                      <span className="diff-viewer-file-item-dir" title={file.path}>
-                        {dir}
-                      </span>
-                    )}
-                  </span>
-                  <span className="diff-viewer-file-item-stats">
-                    {file.additions > 0 && (
-                      <span className="diff-viewer-additions">+{file.additions}</span>
-                    )}
-                    {file.deletions > 0 && (
-                      <span className="diff-viewer-deletions">-{file.deletions}</span>
-                    )}
-                  </span>
-                  <svg
-                    className={`diff-viewer-chevron${isExpanded ? " open" : ""}`}
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 6l4 4 4-4" />
-                  </svg>
-                </button>
-                {isExpanded && (
-                  <div className="diff-viewer-file-item-content">
-                    {(loading && !fileDiff) || (!monacoLoaded && !error) ? (
-                      <div className="diff-viewer-loading">
-                        <div className="spinner"></div>
-                      </div>
-                    ) : null}
-                    <div
-                      ref={editorContainerRef}
-                      className="diff-viewer-editor"
-                      style={{ display: fileDiff && monacoLoaded ? "block" : "none" }}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          <div
+            ref={editorContainerRef}
+            className="diff-viewer-editor"
+            style={{ display: fileDiff && monacoLoaded ? "block" : "none" }}
+          />
         </div>
 
-        {/* Mobile floating change nav */}
+        {/* Mobile floating nav buttons at bottom */}
         {isMobile && (
           <div className="diff-viewer-mobile-nav">
             <button
@@ -1333,6 +1274,14 @@ function DiffViewer({
               }
             >
               {mode === "comment" ? "💬" : "✏️"}
+            </button>
+            <button
+              className="diff-viewer-mobile-nav-btn"
+              onClick={goToPreviousFile}
+              disabled={!hasPrevFile}
+              title="Previous file (<)"
+            >
+              <PrevFileIcon />
             </button>
             <button
               className="diff-viewer-mobile-nav-btn"
@@ -1349,6 +1298,14 @@ function DiffViewer({
               title="Next change (.)"
             >
               <NextChangeIcon />
+            </button>
+            <button
+              className="diff-viewer-mobile-nav-btn"
+              onClick={() => goToNextFile()}
+              disabled={!hasNextFile}
+              title="Next file (>)"
+            >
+              <NextFileIcon />
             </button>
           </div>
         )}
