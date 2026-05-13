@@ -2556,10 +2556,14 @@ function ChatInterface({
                   <button
                     onClick={() => {
                       setShowOverflowMenu(false);
-                      setShowDiffSidePanel((prev) => {
-                        if (!prev) setDiffSidePanelWidth(50);
-                        return !prev;
-                      });
+                      if (isMobile) {
+                        setShowDiffViewer(true);
+                      } else {
+                        setShowDiffSidePanel((prev) => {
+                          if (!prev) setDiffSidePanelWidth(50);
+                          return !prev;
+                        });
+                      }
                     }}
                     className="overflow-menu-item"
                   >

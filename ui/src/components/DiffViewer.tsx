@@ -252,7 +252,7 @@ function DiffViewer({
   // manifests as backspace deleting multiple characters and arrow keys
   // jumping. So: model swaps + option updates happen in separate effects.
   useEffect(() => {
-    if (!isOpen || !monacoLoaded || !editorContainerRef.current || !monacoRef.current) {
+    if (!isOpen || !monacoLoaded || !editorContainerRef.current || !monacoRef.current || !fileDiff) {
       return;
     }
 
