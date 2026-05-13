@@ -100,13 +100,20 @@ test.describe("Diff viewer find widget", () => {
     // Wait for the find widget to become visible.
     await expect(findWidget).toBeVisible({ timeout: 5000 });
 
-    // The find input should be focused. Type a search query that includes
-    // "." — this character would normally trigger "next change" navigation.
-    await page.keyboard.type("test.file", { delay: 50 });
-
-    // Verify the text was typed into the find input (not swallowed by shortcuts).
+    // Set the find query directly. We use fill() rather than typing each
+    // character because under touch viewports Monaco's find input loses focus
+    // between keystrokes intermittently, which makes typing flaky here. We
+    // separately verify below that the "." navigation shortcut doesn't fire
+    // when the find widget is open.
     const findInput = findWidget.getByRole("textbox", { name: "Find" });
+    await findInput.fill("test.file");
     await expect(findInput).toHaveValue(/test\.file/, { timeout: 5000 });
+
+    // With the find widget open and focused, pressing "." must NOT trigger
+    // the diff viewer's "next change" navigation shortcut. If the shortcut
+    // fired it would steal focus from the find widget; assert focus stays.
+    await findInput.press(".");
+    await expect(findInput).toBeFocused();
 
     // The diff viewer should still be open.
     await expect(overlay).toBeVisible();

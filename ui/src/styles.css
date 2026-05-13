@@ -5247,6 +5247,19 @@ svg {
     left: 0 !important;
   }
 
+  /* On mobile the file list overflows the container (many rows at 38px each),
+     so flex:1 on the expanded item finds no slack to grow into and its slot
+     collapses to 0 — Monaco mounts but is invisible. Give the expanded item a
+     defined height and let the list scroll so the other rows are reachable. */
+  .diff-viewer-file-list {
+    overflow-y: auto;
+  }
+
+  .diff-viewer-file-item.expanded {
+    flex: 0 0 auto;
+    min-height: 60vh;
+  }
+
   /* Comment dialog on top half of screen for mobile (keyboard space) */
   .diff-viewer-comment-dialog {
     top: 10%;
