@@ -972,7 +972,12 @@ function ChatInterface({
   );
   const [diffViewerCwd, setDiffViewerCwd] = useState<string | undefined>(undefined);
   const [diffCommentText, setDiffCommentText] = useState("");
-  const [showDiffSidePanel, setShowDiffSidePanel] = useState(false);
+  const [showDiffSidePanel, setShowDiffSidePanel] = useState(
+    () => localStorage.getItem("shelley_diff_side_panel_open") === "true",
+  );
+  useEffect(() => {
+    localStorage.setItem("shelley_diff_side_panel_open", String(showDiffSidePanel));
+  }, [showDiffSidePanel]);
   const [diffSidePanelWidth, setDiffSidePanelWidth] = useState(50); // percentage of chat body row
   const diffSidePanelResizingRef = useRef(false);
   const diffSidePanelStartXRef = useRef(0);

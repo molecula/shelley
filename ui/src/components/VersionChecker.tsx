@@ -78,8 +78,16 @@ function VersionModal({ isOpen, onClose, versionInfo, isLoading }: VersionModalP
     try {
       await api.upgrade(true);
     } catch (err) {
-      // Connection drop is expected when server restarts, treat as success
-      console.log("Upgrade response failed (expected during restart):", err);
+      if (err instanceof TypeError) {
+        // TypeError means a network/connection error — expected when server drops
+        // the connection mid-response because it's restarting. Treat as success.
+        console.log("Connection dropped (expected during restart):", err);
+      } else {
+        // Any other error (HTTP 4xx/5xx from the server) is a real failure.
+        setUpgradeError(err instanceof Error ? err.message : String(err));
+        setUpgrading(false);
+        return;
+      }
     }
     // Wait a bit for server to restart, then reload the page
     setTimeout(() => {

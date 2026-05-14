@@ -936,6 +936,16 @@ function DiffViewer({
         return;
       }
 
+      // Don't steal keystrokes from text inputs outside the diff viewer (e.g. chat textarea)
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl instanceof HTMLElement && activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
       // Intercept PageUp/PageDown to scroll the diff editor instead of background
       if (e.key === "PageUp" || e.key === "PageDown") {
         if (editorRef.current) {
