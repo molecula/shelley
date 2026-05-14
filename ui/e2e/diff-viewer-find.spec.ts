@@ -60,24 +60,35 @@ test.describe("Diff viewer find widget", () => {
     const overlay = page.locator(".diff-viewer-overlay");
     await expect(overlay).toBeVisible({ timeout: 10000 });
 
-    // Select the first non-empty commit if working changes are empty.
-    // The diff viewer auto-selects, but we need a file to be loaded.
-    // Wait for a file to appear in the file selector.
-    const fileSelect = overlay.locator("select.diff-viewer-select").nth(1);
-    await expect(async () => {
-      const options = await fileSelect.locator("option").count();
-      expect(options).toBeGreaterThan(1); // more than just the placeholder
-    }).toPass({ timeout: 15000 });
+    // When the diff viewer falls back to the most recent commit (clean tree in
+    // CI), it prepends a synthetic "commit-message:" pseudo-file and auto-
+    // selects it. That pseudo-file does NOT mount Monaco, so the find widget
+    // would never appear. Pick the first real (non-commit-message) file by
+    // filtering on the header text — the parent .diff-viewer-file-item also
+    // contains the expanded Monaco content, which can spuriously match if the
+    // currently-shown file happens to contain the filter string. With a dirty
+    // tree (working changes), there are no commit-message entries and the
+    // first real file is already expanded — the guard skips the click then.
+    const firstRealFileHeader = overlay
+      .locator(".diff-viewer-file-item-header")
+      .filter({ hasNotText: /commit-message:/ })
+      .first();
+    await expect(firstRealFileHeader).toBeVisible({ timeout: 10000 });
+    const alreadyExpanded = await firstRealFileHeader.evaluate(
+      (el) => el.parentElement?.classList.contains("expanded") ?? false,
+    );
+    if (!alreadyExpanded) {
+      await firstRealFileHeader.click();
+    }
 
-    // Wait for Monaco editor to render inside the diff viewer.
+    // Now wait for the Monaco editor to render inside the expanded row's slot.
     const editorContainer = overlay.locator(".diff-viewer-editor");
     await expect(async () => {
       const visible = await editorContainer.isVisible();
       expect(visible).toBeTruthy();
-      // Monaco creates .monaco-editor elements when ready
       const monacoEl = await editorContainer.locator(".monaco-editor").count();
       expect(monacoEl).toBeGreaterThan(0);
-    }).toPass({ timeout: 15000 });
+    }).toPass({ timeout: 30000 });
 
     // Verify the find widget is NOT visible initially.
     const findWidget = editorContainer.locator(".find-widget.visible");
@@ -89,13 +100,20 @@ test.describe("Diff viewer find widget", () => {
     // Wait for the find widget to become visible.
     await expect(findWidget).toBeVisible({ timeout: 5000 });
 
-    // The find input should be focused. Type a search query that includes
-    // "." — this character would normally trigger "next change" navigation.
-    await page.keyboard.type("test.file", { delay: 50 });
-
-    // Verify the text was typed into the find input (not swallowed by shortcuts).
+    // Set the find query directly. We use fill() rather than typing each
+    // character because under touch viewports Monaco's find input loses focus
+    // between keystrokes intermittently, which makes typing flaky here. We
+    // separately verify below that the "." navigation shortcut doesn't fire
+    // when the find widget is open.
     const findInput = findWidget.getByRole("textbox", { name: "Find" });
+    await findInput.fill("test.file");
     await expect(findInput).toHaveValue(/test\.file/, { timeout: 5000 });
+
+    // With the find widget open and focused, pressing "." must NOT trigger
+    // the diff viewer's "next change" navigation shortcut. If the shortcut
+    // fired it would steal focus from the find widget; assert focus stays.
+    await findInput.press(".");
+    await expect(findInput).toBeFocused();
 
     // The diff viewer should still be open.
     await expect(overlay).toBeVisible();

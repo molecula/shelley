@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 
-declare const self: ServiceWorkerGlobalScope;
+export {};
+
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
 interface PushPayload {
   title?: string;
@@ -9,7 +11,7 @@ interface PushPayload {
   url?: string;
 }
 
-self.addEventListener("push", (event) => {
+sw.addEventListener("push", (event: PushEvent) => {
   let data: PushPayload = {};
   try {
     data = event.data?.json() ?? {};
@@ -26,32 +28,29 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(sw.registration.showNotification(title, options));
 });
 
-self.addEventListener("notificationclick", (event) => {
+sw.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const url: string = (event.notification.data as { url?: string })?.url || "/";
 
   event.waitUntil(
-    self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((windowClients) => {
-        for (const client of windowClients) {
-          if ("focus" in client) {
-            return client.focus();
-          }
+    sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if ("focus" in client) {
+          return client.focus();
         }
-        return self.clients.openWindow(url);
-      }),
+      }
+      return sw.clients.openWindow(url);
+    }),
   );
 });
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+sw.addEventListener("install", (event: ExtendableEvent) => {
+  event.waitUntil(sw.skipWaiting());
 });
 
-// Take control of all pages immediately on activation
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+sw.addEventListener("activate", (event: ExtendableEvent) => {
+  event.waitUntil(sw.clients.claim());
 });
