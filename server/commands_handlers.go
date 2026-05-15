@@ -112,12 +112,7 @@ func (s *Server) handleUserSkills(w http.ResponseWriter, r *http.Request) {
 		gitRoot = gs.Worktree
 	}
 
-	var projectDirs []string
-	projectDirs = append(projectDirs, skills.ProjectSkillsDirs(cwd, gitRoot)...)
-	projectSet := make(map[string]bool)
-	for _, d := range projectDirs {
-		projectSet[d] = true
-	}
+	projectDirs := skills.ProjectSkillsDirs(cwd, gitRoot)
 
 	var out []UserSkill
 	for _, sk := range skills.ListAll(cwd, gitRoot) {
@@ -125,9 +120,11 @@ func (s *Server) handleUserSkills(w http.ResponseWriter, r *http.Request) {
 		if sk.Path == "" {
 			scope = "builtin"
 		} else {
-			parent := filepath.Dir(sk.Path)
-			if projectSet[filepath.Dir(parent)] || projectSet[parent] {
-				scope = "project"
+			for _, d := range projectDirs {
+				if strings.HasPrefix(sk.Path, d+string(filepath.Separator)) {
+					scope = "project"
+					break
+				}
 			}
 		}
 		out = append(out, UserSkill{

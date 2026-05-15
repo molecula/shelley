@@ -187,7 +187,8 @@ export default SlashCommandPalette;
 // Render a user-command body, substituting $ARGUMENTS.
 export function renderUserCommand(body: string, args: string): string {
   if (body.includes("$ARGUMENTS")) {
-    return body.replace(/\$ARGUMENTS/g, args);
+    // Use function replacement so $-sequences in args (e.g. $&, $1) are not interpreted.
+    return body.replace(/\$ARGUMENTS/g, () => args);
   }
   return args ? `${body}\n\n${args}` : body;
 }

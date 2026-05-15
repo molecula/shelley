@@ -380,6 +380,8 @@ function MessageInput({
       // Auto-queue when distilling or when explicitly requested
       if (autoQueue && onQueue) {
         const expanded = expandWithSlash(message);
+        const originalMessage = message;
+        const originalSlash = loadedSlash;
         setMessage("");
         setLoadedSlash(null);
         if (persistKey) {
@@ -388,7 +390,8 @@ function MessageInput({
         try {
           await onQueue(expanded);
         } catch {
-          setMessage(message);
+          setMessage(originalMessage);
+          setLoadedSlash(originalSlash);
         }
         return;
       }

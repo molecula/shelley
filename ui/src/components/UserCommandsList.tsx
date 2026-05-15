@@ -55,7 +55,7 @@ function UserCommandsList({ cwd }: UserCommandsListProps) {
     <>
       <ul className="skills-list">
         {commands.map((c) => (
-          <li key={c.path}>
+          <li key={`${c.scope}:${c.name}`}>
             <button type="button" className="skills-list-item" onClick={() => setViewing(c)}>
               <span className="skills-list-name">/{c.name}</span>
               <span className="skills-list-desc">{c.description || c.path}</span>

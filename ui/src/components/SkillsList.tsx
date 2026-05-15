@@ -55,7 +55,7 @@ function SkillsList({ cwd }: SkillsListProps) {
     <>
       <ul className="skills-list">
         {skills.map((s) => (
-          <li key={s.path}>
+          <li key={`${s.scope}:${s.name}`}>
             <button type="button" className="skills-list-item" onClick={() => setViewing(s.name)}>
               <span className="skills-list-name">{s.name}</span>
               <span className="skills-list-desc">{s.description}</span>
