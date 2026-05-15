@@ -460,8 +460,9 @@ func (vc *VersionChecker) DoUpgrade(ctx context.Context) error {
 		return fmt.Errorf("version checking is disabled")
 	}
 
-	// Get cached info or fetch fresh
-	info, err := vc.Check(ctx, false)
+	// Always fetch fresh version info before upgrading so we get the latest
+	// download URL, not one that may have been cached before a new release landed.
+	info, err := vc.Check(ctx, true)
 	if err != nil {
 		return fmt.Errorf("failed to check version: %w", err)
 	}
