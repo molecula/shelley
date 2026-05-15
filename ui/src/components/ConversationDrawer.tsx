@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Conversation, ConversationWithState } from "../types";
 import { api } from "../services/api";
 import { useI18n } from "../i18n";
+import SkillsList from "./SkillsList";
+import UserCommandsList from "./UserCommandsList";
 
 type GroupBy = "none" | "cwd" | "git_repo";
 type SortBy = "activity" | "created" | "name";
@@ -59,6 +61,23 @@ function ConversationDrawer({
   });
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"conversations" | "library">(() => {
+    const stored = localStorage.getItem("shelley-drawer-mode");
+    // Migrate old "skills" value to "library".
+    return stored === "library" || stored === "skills" ? "library" : "conversations";
+  });
+  const handleDrawerModeChange = useCallback((mode: "conversations" | "library") => {
+    setDrawerMode(mode);
+    localStorage.setItem("shelley-drawer-mode", mode);
+  }, []);
+  const [librarySection, setLibrarySection] = useState<"skills" | "commands">(() => {
+    const stored = localStorage.getItem("shelley-library-section");
+    return stored === "commands" ? "commands" : "skills";
+  });
+  const handleLibrarySectionChange = useCallback((section: "skills" | "commands") => {
+    setLibrarySection(section);
+    localStorage.setItem("shelley-library-section", section);
+  }, []);
   const [copiedConvId, setCopiedConvId] = useState<string | null>(null);
   const groupMenuRef = React.useRef<HTMLDivElement>(null);
   const renameInputRef = React.useRef<HTMLInputElement>(null);
@@ -772,10 +791,30 @@ function ConversationDrawer({
       <div className={`drawer ${isOpen ? "open" : ""} ${isCollapsed ? "collapsed" : ""}`}>
         {/* Header */}
         <div className="drawer-header">
-          <h2 className="drawer-title">{showArchived ? t("archived") : t("conversations")}</h2>
+          <div className="drawer-mode-tabs" role="tablist">
+            <button
+              role="tab"
+              aria-selected={drawerMode === "conversations" && !showArchived}
+              className={`drawer-mode-tab${drawerMode === "conversations" && !showArchived ? " active" : ""}`}
+              onClick={() => {
+                handleDrawerModeChange("conversations");
+                setShowArchived(false);
+              }}
+            >
+              {showArchived ? t("archived") : t("conversations")}
+            </button>
+            <button
+              role="tab"
+              aria-selected={drawerMode === "library"}
+              className={`drawer-mode-tab${drawerMode === "library" ? " active" : ""}`}
+              onClick={() => handleDrawerModeChange("library")}
+            >
+              Library
+            </button>
+          </div>
           <div className="drawer-header-actions">
             {/* Group by button */}
-            {!showArchived && (
+            {!showArchived && drawerMode === "conversations" && (
               <div className="group-by-wrapper" ref={groupMenuRef}>
                 <button
                   onClick={() => setGroupMenuOpen((v) => !v)}
@@ -840,7 +879,7 @@ function ConversationDrawer({
               </div>
             )}
             {/* New conversation button - mobile only */}
-            {!showArchived && (
+            {!showArchived && drawerMode === "conversations" && (
               <button
                 onClick={onNewConversation}
                 className="btn-icon hide-on-desktop"
@@ -889,9 +928,35 @@ function ConversationDrawer({
           </div>
         </div>
 
-        {/* Conversations list */}
+        {/* Body */}
         <div className="drawer-body scrollable">
-          {loadingArchived && showArchived ? (
+          {drawerMode === "library" ? (
+            <div className="library-pane">
+              <div className="library-section-tabs" role="tablist">
+                <button
+                  role="tab"
+                  aria-selected={librarySection === "skills"}
+                  className={`library-section-tab${librarySection === "skills" ? " active" : ""}`}
+                  onClick={() => handleLibrarySectionChange("skills")}
+                >
+                  Skills
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={librarySection === "commands"}
+                  className={`library-section-tab${librarySection === "commands" ? " active" : ""}`}
+                  onClick={() => handleLibrarySectionChange("commands")}
+                >
+                  Commands
+                </button>
+              </div>
+              {librarySection === "skills" ? (
+                <SkillsList cwd={viewedConversation?.cwd || undefined} />
+              ) : (
+                <UserCommandsList cwd={viewedConversation?.cwd || undefined} />
+              )}
+            </div>
+          ) : loadingArchived && showArchived ? (
             <div className="text-secondary drawer-empty-state">
               <p>{t("loading")}</p>
             </div>
@@ -945,32 +1010,34 @@ function ConversationDrawer({
           )}
         </div>
 
-        {/* Footer with archived toggle */}
-        <div className="drawer-footer">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className="btn-secondary drawer-footer-button"
-          >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="drawer-icon-size">
-              {showArchived ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                />
-              )}
-            </svg>
-            <span>{showArchived ? t("backToConversations") : t("viewArchived")}</span>
-          </button>
-        </div>
+        {/* Footer with archived toggle (hidden in library mode) */}
+        {drawerMode === "conversations" && (
+          <div className="drawer-footer">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="btn-secondary drawer-footer-button"
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="drawer-icon-size">
+                {showArchived ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                  />
+                )}
+              </svg>
+              <span>{showArchived ? t("backToConversations") : t("viewArchived")}</span>
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

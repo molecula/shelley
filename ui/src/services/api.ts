@@ -454,6 +454,39 @@ class ApiService {
     return response.json();
   }
 
+  async getSlashCommands(cwd?: string): Promise<SlashCommandsResponse> {
+    const url = cwd
+      ? `${this.baseUrl}/commands?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/commands`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load slash commands: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async getUserSkills(cwd?: string): Promise<UserSkillSummary[]> {
+    const url = cwd
+      ? `${this.baseUrl}/user-skills?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/user-skills`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load user skills: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async getUserSkillContent(name: string, cwd?: string): Promise<UserSkillContent> {
+    const url = cwd
+      ? `${this.baseUrl}/user-skills/${encodeURIComponent(name)}?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/user-skills/${encodeURIComponent(name)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load skill content: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
   async setSetting(key: string, value: string): Promise<{ status: string }> {
     const response = await fetch("/settings", {
       method: "POST",
@@ -472,6 +505,47 @@ class ApiService {
 }
 
 export const api = new ApiService();
+
+export interface SlashBuiltin {
+  name: string;
+  description: string;
+  action: string;
+}
+
+export interface SlashUserCommand {
+  name: string;
+  description: string;
+  argument_hint?: string;
+  body: string;
+  path: string;
+  scope: string;
+}
+
+export interface SlashSkill {
+  name: string;
+  description: string;
+  is_builtin: boolean;
+}
+
+export interface SlashCommandsResponse {
+  builtins: SlashBuiltin[];
+  user_commands: SlashUserCommand[];
+  skills: SlashSkill[];
+}
+
+export interface UserSkillSummary {
+  name: string;
+  description: string;
+  path: string;
+  scope: string;
+}
+
+export interface UserSkillContent {
+  name: string;
+  description: string;
+  path: string;
+  content: string;
+}
 
 // Custom models API
 export interface CustomModel {
