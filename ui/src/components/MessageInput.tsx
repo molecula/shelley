@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useI18n } from "../i18n";
 import HostIcon from "./HostIcon";
+import SlashCommandPalette, { SlashItem, renderUserCommand } from "./SlashCommandPalette";
 
 // Web Speech API types
 interface SpeechRecognitionEvent extends Event {
@@ -64,6 +65,10 @@ interface MessageInputProps {
   initialRows?: number;
   /** Status bar content rendered inline on mobile (hidden on desktop) */
   statusSlot?: React.ReactNode;
+  /** Current working directory — used to load slash-command suggestions. */
+  cwd?: string;
+  /** Called when the user picks a built-in slash command from the palette. */
+  onSlashAction?: (action: string) => void;
 }
 
 const PERSIST_KEY_PREFIX = "shelley_draft_";
@@ -82,6 +87,8 @@ function MessageInput({
   persistKey,
   initialRows = 1,
   statusSlot,
+  cwd,
+  onSlashAction,
 }: MessageInputProps) {
   const { t } = useI18n();
   const [message, setMessage] = useState(() => {
@@ -101,6 +108,15 @@ function MessageInput({
   });
   const [showQueueMenu, setShowQueueMenu] = useState(false);
   const queueMenuRef = useRef<HTMLDivElement>(null);
+  // Slash command palette state. null = closed; "" = open and showing all; non-empty = filtered.
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const slashKeyHandlerRef = useRef<((e: KeyboardEvent) => boolean) | null>(null);
+  // When a skill or user-command is selected from the palette, store it here.
+  // The chip shows next to the textarea; on submit the message is expanded.
+  type LoadedSlash =
+    | { kind: "skill"; name: string }
+    | { kind: "user-command"; name: string; body: string; argumentHint?: string };
+  const [loadedSlash, setLoadedSlash] = useState<LoadedSlash | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -342,9 +358,20 @@ function MessageInput({
     }
   }, [injectedText, onClearInjectedText]);
 
+  // Expand the chip + user text into the final outgoing message.
+  const expandWithSlash = useCallback((text: string): string => {
+    if (!loadedSlash) return text;
+    const userArgs = text.trim();
+    if (loadedSlash.kind === "skill") {
+      const base = `Use the ${loadedSlash.name} skill.`;
+      return userArgs ? `${base}\n\n${userArgs}` : base;
+    }
+    return renderUserCommand(loadedSlash.body, userArgs);
+  }, [loadedSlash]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() && !disabled && !submitting && uploadsInProgress === 0) {
+    if ((message.trim() || loadedSlash) && !disabled && !submitting && uploadsInProgress === 0) {
       // Stop listening if we were recording
       if (isListening) {
         stopListening();
@@ -352,31 +379,40 @@ function MessageInput({
 
       // Auto-queue when distilling or when explicitly requested
       if (autoQueue && onQueue) {
-        const messageToQueue = message.trim();
+        const expanded = expandWithSlash(message);
+        const originalMessage = message;
+        const originalSlash = loadedSlash;
         setMessage("");
+        setLoadedSlash(null);
         if (persistKey) {
           localStorage.removeItem(PERSIST_KEY_PREFIX + persistKey);
         }
         try {
-          await onQueue(messageToQueue);
+          await onQueue(expanded);
         } catch {
-          setMessage(messageToQueue);
+          setMessage(originalMessage);
+          setLoadedSlash(originalSlash);
         }
         return;
       }
 
-      const messageToSend = message;
+      const expanded = expandWithSlash(message);
+      const originalMessage = message;
+      const originalSlash = loadedSlash;
       setSubmitting(true);
       try {
-        await onSend(messageToSend);
+        await onSend(expanded);
         // Only clear on success
         setMessage("");
+        setLoadedSlash(null);
         // Clear persisted draft on successful send
         if (persistKey) {
           localStorage.removeItem(PERSIST_KEY_PREFIX + persistKey);
         }
       } catch {
         // Keep the message on error so user can retry
+        setMessage(originalMessage);
+        setLoadedSlash(originalSlash);
       } finally {
         setSubmitting(false);
       }
@@ -384,51 +420,115 @@ function MessageInput({
   };
 
   const handleQueueMessage = async () => {
-    if (message.trim() && onQueue) {
+    if ((message.trim() || loadedSlash) && onQueue) {
       if (isListening) {
         stopListening();
       }
-      const messageToQueue = message.trim();
+      const expanded = expandWithSlash(message);
+      const originalMessage = message;
+      const originalSlash = loadedSlash;
       setMessage("");
+      setLoadedSlash(null);
       if (persistKey) {
         localStorage.removeItem(PERSIST_KEY_PREFIX + persistKey);
       }
       setShowQueueMenu(false);
       try {
-        await onQueue(messageToQueue);
+        await onQueue(expanded);
       } catch {
-        // Restore message on failure
-        setMessage(messageToQueue);
+        setMessage(originalMessage);
+        setLoadedSlash(originalSlash);
       }
     }
   };
 
   /** Send now (bypass auto-queue) — used from the dropdown during distill mode */
   const handleSendNow = async () => {
-    if (message.trim() && !disabled && !submitting && uploadsInProgress === 0) {
+    if ((message.trim() || loadedSlash) && !disabled && !submitting && uploadsInProgress === 0) {
       if (isListening) {
         stopListening();
       }
-      const messageToSend = message.trim();
+      const expanded = expandWithSlash(message);
+      const originalMessage = message;
+      const originalSlash = loadedSlash;
       setMessage("");
+      setLoadedSlash(null);
       if (persistKey) {
         localStorage.removeItem(PERSIST_KEY_PREFIX + persistKey);
       }
       setShowQueueMenu(false);
       setSubmitting(true);
       try {
-        await onSend(messageToSend);
+        await onSend(expanded);
       } catch {
-        setMessage(messageToSend);
+        setMessage(originalMessage);
+        setLoadedSlash(originalSlash);
       } finally {
         setSubmitting(false);
       }
     }
   };
 
+  // Update slash-palette state whenever the message changes.
+  useEffect(() => {
+    // Palette is active when message starts with `/` and contains no whitespace yet.
+    if (message.startsWith("/") && !/\s/.test(message)) {
+      setSlashQuery(message.slice(1));
+    } else {
+      setSlashQuery(null);
+    }
+  }, [message]);
+
+  const handleSlashSelect = useCallback(
+    (item: SlashItem) => {
+      if (item.kind === "builtin") {
+        setMessage("");
+        setSlashQuery(null);
+        onSlashAction?.(item.action);
+        return;
+      }
+      // For skills and user-commands, drop a chip and clear the slash query.
+      // The textarea is cleared (the chip replaces the `/foo` text) and the user
+      // continues typing their actual prompt/arguments.
+      if (item.kind === "skill") {
+        setLoadedSlash({ kind: "skill", name: item.name });
+      } else {
+        setLoadedSlash({
+          kind: "user-command",
+          name: item.name,
+          body: item.body,
+          argumentHint: item.argumentHint,
+        });
+      }
+      setMessage("");
+      setSlashQuery(null);
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    },
+    [onSlashAction],
+  );
+
+  const registerSlashKeyHandler = useCallback(
+    (handler: ((e: KeyboardEvent) => boolean) | null) => {
+      slashKeyHandlerRef.current = handler;
+    },
+    [],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Don't submit while IME is composing (e.g., converting Japanese hiragana to kanji)
     if (e.nativeEvent.isComposing) {
+      return;
+    }
+    // Let the slash palette intercept Arrow/Enter/Tab/Escape when open.
+    if (slashQuery !== null && slashKeyHandlerRef.current) {
+      if (slashKeyHandlerRef.current(e.nativeEvent)) {
+        return;
+      }
+    }
+    // Backspace at the start of an empty textarea pops the loaded chip.
+    if (e.key === "Backspace" && loadedSlash && message === "") {
+      e.preventDefault();
+      setLoadedSlash(null);
       return;
     }
     if (e.key === "Enter" && !e.shiftKey) {
@@ -515,7 +615,7 @@ function MessageInput({
   }, []);
 
   const isDisabled = disabled;
-  const canSubmit = message.trim() && !isDisabled && !submitting && uploadsInProgress === 0;
+  const canSubmit = (message.trim() || loadedSlash) && !isDisabled && !submitting && uploadsInProgress === 0;
 
   const isDraggingOver = dragCounter > 0;
   // Check if user is typing a shell command (starts with !)
@@ -552,6 +652,30 @@ function MessageInput({
           </div>
         )}
         <div className="textarea-wrapper">
+          <SlashCommandPalette
+            query={slashQuery}
+            cwd={cwd}
+            onSelect={handleSlashSelect}
+            onClose={() => setSlashQuery(null)}
+            registerKeyHandler={registerSlashKeyHandler}
+          />
+          {loadedSlash && (
+            <div className="slash-chip-row">
+              <button
+                type="button"
+                className={`slash-chip slash-chip-${loadedSlash.kind}`}
+                onClick={() => setLoadedSlash(null)}
+                title={`Click to remove. ${loadedSlash.kind === "user-command" ? "This command's prompt will run when you send." : "This skill will be activated when you send."}`}
+              >
+                <span className="slash-chip-prefix">/</span>
+                <span className="slash-chip-name">{loadedSlash.name}</span>
+                {loadedSlash.kind === "user-command" && loadedSlash.argumentHint && (
+                  <span className="slash-chip-hint"> {loadedSlash.argumentHint}</span>
+                )}
+                <span className="slash-chip-close" aria-hidden="true">×</span>
+              </button>
+            </div>
+          )}
           {isShellMode && (
             <div className="shell-mode-indicator" title="This will run as a shell command">
               <svg
@@ -579,7 +703,7 @@ function MessageInput({
                 requestAnimationFrame(() => requestAnimationFrame(onFocus));
               }
             }}
-            placeholder={placeholderText}
+            placeholder={loadedSlash ? (loadedSlash.kind === "user-command" && loadedSlash.argumentHint ? loadedSlash.argumentHint : "Add a message or press Enter to run…") : placeholderText}
             className="message-textarea"
             disabled={isDisabled}
             rows={initialRows}

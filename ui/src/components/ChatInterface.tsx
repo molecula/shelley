@@ -3021,6 +3021,30 @@ function ChatInterface({
           persistKey={conversationId || "new-conversation"}
           initialRows={conversationId ? 1 : 3}
           statusSlot={conversationId && isMobile ? renderStatusContent() : undefined}
+          cwd={currentConversation?.cwd || selectedCwd || undefined}
+          onSlashAction={async (action) => {
+            switch (action) {
+              case "new-conversation":
+                onNewConversation();
+                break;
+              case "clear":
+                if (conversationId && onArchiveConversation) {
+                  try {
+                    await onArchiveConversation(conversationId);
+                  } catch (err) {
+                    console.error("Failed to archive conversation:", err);
+                  }
+                }
+                onNewConversation();
+                break;
+              case "open-model-picker":
+                onOpenModelsModal?.();
+                break;
+              case "help":
+                // No-op for now — the palette itself is the help.
+                break;
+            }
+          }}
         />
       )}
       </div>{/* end chat-column */}

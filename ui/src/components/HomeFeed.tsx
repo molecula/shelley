@@ -388,6 +388,10 @@ function HomeFeed({
             autoFocus={true}
             persistKey="home-feed-new"
             initialRows={2}
+            cwd={selectedCwd || undefined}
+            onSlashAction={(action) => {
+              if (action === "open-model-picker") onOpenModelsModal?.();
+            }}
             statusSlot={
               <div className="hf-new-fields">
                 <div className="status-field status-field-model">
