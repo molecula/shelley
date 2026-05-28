@@ -7,6 +7,7 @@ import ConversationDrawer from "./components/ConversationDrawer";
 import CommandPalette from "./components/CommandPalette";
 import ModelsModal from "./components/ModelsModal";
 import NotificationsModal from "./components/NotificationsModal";
+import ScheduledTasksModal from "./components/ScheduledTasksModal";
 import HomeFeed from "./components/HomeFeed";
 import { Conversation, ConversationWithState, ConversationListUpdate } from "./types";
 import { api } from "./services/api";
@@ -128,6 +129,7 @@ function App() {
   const [directoryPickerTrigger, setDirectoryPickerTrigger] = useState(0);
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+  const [scheduledTasksModalOpen, setScheduledTasksModalOpen] = useState(false);
   const [modelsRefreshTrigger, setModelsRefreshTrigger] = useState(0);
   const [navigateUserMessageTrigger, setNavigateUserMessageTrigger] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -808,6 +810,10 @@ function App() {
             setNotificationsModalOpen(true);
             setCommandPaletteOpen(false);
           }}
+          onOpenScheduledTasksModal={() => {
+            setScheduledTasksModalOpen(true);
+            setCommandPaletteOpen(false);
+          }}
           onNextConversation={navigateToNextConversation}
           onPreviousConversation={navigateToPreviousConversation}
           onNextUserMessage={navigateToNextUserMessage}
@@ -824,6 +830,11 @@ function App() {
         <NotificationsModal
           isOpen={notificationsModalOpen}
           onClose={() => setNotificationsModalOpen(false)}
+        />
+
+        <ScheduledTasksModal
+          isOpen={scheduledTasksModalOpen}
+          onClose={() => setScheduledTasksModalOpen(false)}
         />
 
         {/* Backdrop for mobile drawer */}

@@ -799,3 +799,39 @@ class PushApi {
 }
 
 export const pushApi = new PushApi();
+
+export interface ScheduledTask {
+  name: string;
+  description: string;
+  exec_start: string;
+  next_fire: string;
+  last_fire: string;
+  timer_state: string;
+  on_calendar: string;
+  persistent: boolean;
+}
+
+class ScheduledTasksApi {
+  private baseUrl = "/api";
+
+  async list(): Promise<ScheduledTask[]> {
+    const response = await fetch(`${this.baseUrl}/scheduled-tasks`);
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(body.trim() || `Failed to list scheduled tasks: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async remove(name: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/scheduled-tasks/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(body.trim() || `Failed to remove scheduled task: ${response.statusText}`);
+    }
+  }
+}
+
+export const scheduledTasksApi = new ScheduledTasksApi();

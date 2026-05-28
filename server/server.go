@@ -339,6 +339,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/push/subscribe", http.HandlerFunc(s.handlePushSubscribe))
 	mux.Handle("POST /api/push/unsubscribe", http.HandlerFunc(s.handlePushUnsubscribe))
 
+	// Scheduled tasks (systemd user timers named shelley-*)
+	mux.Handle("/api/scheduled-tasks", http.HandlerFunc(s.handleScheduledTasks))
+	mux.Handle("/api/scheduled-tasks/", http.HandlerFunc(s.handleScheduledTask))
+
 	// Models API (dynamic list refresh)
 	mux.Handle("/api/models", http.HandlerFunc(s.handleModels))
 	mux.Handle("/api/host-icon", http.HandlerFunc(s.handleHostIcon))

@@ -27,6 +27,7 @@ interface CommandPaletteProps {
   onOpenDiffViewer: () => void;
   onOpenModelsModal: () => void;
   onOpenNotificationsModal: () => void;
+  onOpenScheduledTasksModal: () => void;
   onNextConversation: () => void;
   onPreviousConversation: () => void;
   onNextUserMessage: () => void;
@@ -82,6 +83,7 @@ function CommandPalette({
   onOpenDiffViewer,
   onOpenModelsModal,
   onOpenNotificationsModal,
+  onOpenScheduledTasksModal,
   onNextConversation,
   onPreviousConversation,
   onNextUserMessage,
@@ -363,6 +365,23 @@ function CommandPalette({
       keywords: ["notification", "notify", "alert", "discord", "webhook", "browser", "favicon"],
     });
 
+    items.push({
+      id: "scheduled-tasks",
+      type: "action",
+      title: t("scheduledTasks"),
+      subtitle: t("viewScheduledTasks"),
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      action: () => {
+        onOpenScheduledTasksModal();
+        onClose();
+      },
+      keywords: ["schedule", "scheduled", "timer", "cron", "systemd", "tasks"],
+    });
+
     const mdLabels: Record<
       string,
       { title: string; subtitle: string; next: "off" | "agent" | "all" }
@@ -600,6 +619,7 @@ function CommandPalette({
     onOpenDiffViewer,
     onOpenModelsModal,
     onOpenNotificationsModal,
+    onOpenScheduledTasksModal,
     onOpenDirectoryPicker,
     onArchiveConversation,
     onNewConversationWithCwd,

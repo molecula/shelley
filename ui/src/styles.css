@@ -8529,4 +8529,82 @@ kbd {
 
 .slash-chip:hover .slash-chip-close {
   opacity: 1;
+/* ScheduledTasksModal styles */
+.scheduled-tasks-modal-wrapper {
+  max-width: 1100px;
+  width: 95vw;
+}
+.scheduled-tasks-modal {
+  padding: 0;
+}
+.scheduled-tasks-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.scheduled-tasks-error {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--error-bg, #fee);
+  color: var(--error-fg, #900);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+.scheduled-tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.scheduled-tasks-table th,
+.scheduled-tasks-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+}
+.scheduled-tasks-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+}
+.scheduled-tasks-name {
+  font-weight: 600;
+  font-family: monospace;
+}
+.scheduled-tasks-desc {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+.scheduled-tasks-flag {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0 0.4rem;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+.scheduled-tasks-exec {
+  display: block;
+  max-width: 320px;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+.scheduled-tasks-delete {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.scheduled-tasks-delete:hover:not(:disabled) {
+  color: var(--error-fg, #c00);
+  border-color: var(--error-fg, #c00);
+}
+.scheduled-tasks-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

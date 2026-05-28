@@ -62,6 +62,15 @@ export interface TranslationKeys {
   configureModels: string;
   notificationSettings: string;
   configureNotifications: string;
+  scheduledTasks: string;
+  viewScheduledTasks: string;
+  noScheduledTasks: string;
+  removeScheduledTask: string;
+  schedule: string;
+  nextFire: string;
+  lastFire: string;
+  command: string;
+  persistent: string;
   enableMarkdownAgent: string;
   renderMarkdownAgent: string;
   enableMarkdownAll: string;
