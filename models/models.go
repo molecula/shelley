@@ -158,9 +158,26 @@ func (c *Config) getFireworksURL() string {
 func All() []Model {
 	return []Model{
 		{
+			ID:              "claude-opus-4.8",
+			Provider:        ProviderAnthropic,
+			Description:     "Claude Opus 4.8 (default)",
+			RequiredEnvVars: []string{"ANTHROPIC_API_KEY"},
+			GatewayEnabled:  true,
+			Factory: func(config *Config, httpc *http.Client) (llm.Service, error) {
+				if config.AnthropicAPIKey == "" {
+					return nil, fmt.Errorf("claude-opus-4.8 requires ANTHROPIC_API_KEY")
+				}
+				svc := &ant.Service{APIKey: config.AnthropicAPIKey, Model: ant.Claude48Opus, HTTPC: httpc, ThinkingLevel: llm.ThinkingLevelMedium}
+				if url := config.getAnthropicURL(); url != "" {
+					svc.URL = url
+				}
+				return svc, nil
+			},
+		},
+		{
 			ID:              "claude-opus-4.7",
 			Provider:        ProviderAnthropic,
-			Description:     "Claude Opus 4.7 (default)",
+			Description:     "Claude Opus 4.7",
 			RequiredEnvVars: []string{"ANTHROPIC_API_KEY"},
 			GatewayEnabled:  true,
 			Factory: func(config *Config, httpc *http.Client) (llm.Service, error) {
@@ -448,7 +465,7 @@ func IDs() []string {
 
 // Default returns the default model
 func Default() Model {
-	return All()[0] // claude-opus-4.7
+	return All()[0] // claude-opus-4.8
 }
 
 // Manager manages LLM services for all configured models
