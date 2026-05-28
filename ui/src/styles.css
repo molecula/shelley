@@ -8608,3 +8608,7 @@ kbd {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.scheduled-tasks-readonly {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 0.875rem;
+}

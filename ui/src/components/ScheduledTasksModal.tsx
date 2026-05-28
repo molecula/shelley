@@ -92,14 +92,20 @@ function ScheduledTasksModal({ isOpen, onClose }: ScheduledTasksModalProps) {
                     <code className="scheduled-tasks-exec">{task.exec_start || "—"}</code>
                   </td>
                   <td>
-                    <button
-                      className="scheduled-tasks-delete"
-                      onClick={() => handleDelete(task.name)}
-                      disabled={pendingDelete === task.name}
-                      title={t("removeScheduledTask")}
-                    >
-                      {pendingDelete === task.name ? "…" : "✕"}
-                    </button>
+                    {task.name.startsWith("shelley-") ? (
+                      <button
+                        className="scheduled-tasks-delete"
+                        onClick={() => handleDelete(task.name)}
+                        disabled={pendingDelete === task.name}
+                        title={t("removeScheduledTask")}
+                      >
+                        {pendingDelete === task.name ? "…" : "✕"}
+                      </button>
+                    ) : (
+                      <span className="scheduled-tasks-readonly" title="Only shelley-* units can be removed from here">
+                        —
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

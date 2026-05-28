@@ -50,18 +50,26 @@ func (s *Server) handleScheduledTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listScheduledTasks(w http.ResponseWriter, r *http.Request) {
-	out, err := exec.Command("systemctl", "--user", "list-unit-files", "shelley-*.timer", "--no-legend", "--no-pager").Output()
+	// list-timers shows both static and runtime-created timers; list-unit-files misses some.
+	out, err := exec.Command("systemctl", "--user", "list-timers", "--all", "--no-legend", "--no-pager").Output()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("list timers: %v", err), http.StatusInternalServerError)
 		return
 	}
 	var tasks []ScheduledTask
+	seen := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
+		var timerUnit string
+		for _, f := range strings.Fields(line) {
+			if strings.HasSuffix(f, ".timer") {
+				timerUnit = f
+				break
+			}
+		}
+		if timerUnit == "" || seen[timerUnit] {
 			continue
 		}
-		timerUnit := fields[0]
+		seen[timerUnit] = true
 		base := strings.TrimSuffix(timerUnit, ".timer")
 		t := ScheduledTask{Name: base}
 		fillFromShow(&t, base+".timer", []string{"NextElapseUSecRealtime", "LastTriggerUSec", "ActiveState", "OnCalendar", "Persistent"})
