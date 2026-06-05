@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -321,17 +319,23 @@ func (m *Response) ToMessage() Message {
 	}
 }
 
-func CostUSDFromResponse(headers http.Header) float64 {
-	h := headers.Get("Exedev-Gateway-Cost")
-	if h == "" {
-		return 0
-	}
-	cost, err := strconv.ParseFloat(h, 64)
-	if err != nil {
-		slog.Warn("failed to parse Exedev-Gateway-Cost header", "header", h)
-		return 0
-	}
-	return cost
+// ModelPrice holds per-million-token prices in USD for a model. Costs are
+// computed locally from token counts returned by each provider, which is the
+// single source of truth for spend reporting.
+type ModelPrice struct {
+	Input      float64 // per 1M non-cached input tokens
+	Output     float64 // per 1M output tokens
+	CacheWrite float64 // per 1M cache-creation (write) input tokens
+	CacheRead  float64 // per 1M cache-read input tokens
+}
+
+// CostUSD returns the dollar cost of the given usage at these prices.
+func (p ModelPrice) CostUSD(u Usage) float64 {
+	const perMillion = 1_000_000.0
+	return (float64(u.InputTokens)*p.Input +
+		float64(u.OutputTokens)*p.Output +
+		float64(u.CacheCreationInputTokens)*p.CacheWrite +
+		float64(u.CacheReadInputTokens)*p.CacheRead) / perMillion
 }
 
 // Usage represents the billing and rate-limit usage.

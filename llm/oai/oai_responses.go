@@ -252,13 +252,13 @@ func fromLLMSystemResponses(systemContent []llm.SystemContent) []responsesInputI
 }
 
 // toLLMResponseFromResponses converts Responses API response to llm.Response
-func (s *ResponsesService) toLLMResponseFromResponses(resp *responsesResponse, headers http.Header) *llm.Response {
+func (s *ResponsesService) toLLMResponseFromResponses(resp *responsesResponse) *llm.Response {
 	if len(resp.Output) == 0 {
 		return &llm.Response{
 			ID:    resp.ID,
 			Model: resp.Model,
 			Role:  llm.MessageRoleAssistant,
-			Usage: s.toLLMUsageFromResponses(resp.Usage, headers),
+			Usage: s.toLLMUsageFromResponses(resp.Usage),
 		}
 	}
 
@@ -313,7 +313,7 @@ func (s *ResponsesService) toLLMResponseFromResponses(resp *responsesResponse, h
 		Role:       llm.MessageRoleAssistant,
 		Content:    contents,
 		StopReason: stopReason,
-		Usage:      s.toLLMUsageFromResponses(resp.Usage, headers),
+		Usage:      s.toLLMUsageFromResponses(resp.Usage),
 	}
 }
 
@@ -324,7 +324,7 @@ func (s *ResponsesService) toLLMResponseFromResponses(resp *responsesResponse, h
 // Our Usage struct follows Anthropic's convention where InputTokens is the non-cached
 // portion and TotalInputTokens() = InputTokens + CacheCreationInputTokens + CacheReadInputTokens.
 // So we map: InputTokens = total - cached, CacheReadInputTokens = cached, CacheCreationInputTokens = 0.
-func (s *ResponsesService) toLLMUsageFromResponses(usage responsesUsage, headers http.Header) llm.Usage {
+func (s *ResponsesService) toLLMUsageFromResponses(usage responsesUsage) llm.Usage {
 	totalIn := uint64(usage.InputTokens)
 	var cached uint64
 	if usage.InputTokensDetails != nil {
@@ -336,7 +336,7 @@ func (s *ResponsesService) toLLMUsageFromResponses(usage responsesUsage, headers
 		CacheReadInputTokens: cached,
 		OutputTokens:         out,
 	}
-	u.CostUSD = llm.CostUSDFromResponse(headers)
+	u.CostUSD = costUSD(s.Model.ModelName, u)
 	return u
 }
 
@@ -529,7 +529,7 @@ func (s *ResponsesService) Do(ctx context.Context, ir *llm.Request) (*llm.Respon
 			}
 		}
 
-		return s.toLLMResponseFromResponses(&resp, httpResp.Header), nil
+		return s.toLLMResponseFromResponses(&resp), nil
 	}
 }
 

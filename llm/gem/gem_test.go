@@ -279,13 +279,6 @@ func TestGeminiHeaderCapture(t *testing.T) {
 	if costHeader != "0.00123456" {
 		t.Fatalf("Expected cost header '0.00123456', got '%s'", costHeader)
 	}
-
-	// Verify that llm.CostUSDFromResponse works with these headers
-	costUSD := llm.CostUSDFromResponse(headers)
-	expectedCost := 0.00123456
-	if costUSD != expectedCost {
-		t.Fatalf("Expected cost USD %.8f, got %.8f", expectedCost, costUSD)
-	}
 }
 
 // mockRoundTripper is a mock HTTP transport for testing
@@ -297,15 +290,15 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return m.response, nil
 }
 
-func TestHeaderCostIntegration(t *testing.T) {
-	// Create a mock HTTP client that returns a response with cost headers
+func TestLocalCostPricing(t *testing.T) {
+	// Cost is now computed locally from token counts; any gateway cost header
+	// is ignored.
 	mockClient := &http.Client{
 		Transport: &mockRoundTripper{
 			response: &http.Response{
 				StatusCode: http.StatusOK,
 				Header: http.Header{
-					"Content-Type":        []string{"application/json"},
-					"Exedev-Gateway-Cost": []string{"0.000500"},
+					"Content-Type": []string{"application/json"},
 				},
 				Body: io.NopCloser(bytes.NewBufferString(`{
 					"candidates": [{
@@ -322,7 +315,7 @@ func TestHeaderCostIntegration(t *testing.T) {
 
 	// Create a Gem service with the mock client
 	service := &Service{
-		Model:  "gemini-test",
+		Model:  "gemini-2.5-pro",
 		APIKey: "test-key",
 		HTTPC:  mockClient,
 		URL:    "https://test.googleapis.com",
@@ -350,10 +343,13 @@ func TestHeaderCostIntegration(t *testing.T) {
 		t.Fatalf("Failed to make request: %v", err)
 	}
 
-	// Verify that the cost was captured from headers
-	expectedCost := 0.0005
-	if res.Usage.CostUSD != expectedCost {
-		t.Fatalf("Expected cost USD %.8f, got %.8f", expectedCost, res.Usage.CostUSD)
+	// Cost is computed locally from estimated token counts and model pricing.
+	want := costUSD("gemini-2.5-pro", res.Usage)
+	if res.Usage.CostUSD != want {
+		t.Fatalf("Expected cost USD %.8f, got %.8f", want, res.Usage.CostUSD)
+	}
+	if res.Usage.CostUSD <= 0 {
+		t.Fatalf("Expected positive local cost, got %.8f", res.Usage.CostUSD)
 	}
 
 	// Verify token counts are still estimated

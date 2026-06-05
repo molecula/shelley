@@ -261,7 +261,7 @@ func TestToLLMResponseFromResponses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			llmResp := svc.toLLMResponseFromResponses(tt.resp, nil)
+			llmResp := svc.toLLMResponseFromResponses(tt.resp)
 
 			if llmResp.ID != tt.resp.ID {
 				t.Errorf("expected ID %s, got %s", tt.resp.ID, llmResp.ID)

@@ -39,11 +39,11 @@ const (
 )
 
 type Model struct {
-	UserName           string // provided by the user to identify this model (e.g. "gpt4.1")
-	ModelName          string // provided to the service provide to specify which model to use (e.g. "gpt-4.1-2025-04-14")
-	URL                string
-	APIKeyEnv          string // environment variable name for the API key
-	IsReasoningModel   bool   // whether this model is a reasoning model (e.g. O3, O4-mini)
+	UserName         string // provided by the user to identify this model (e.g. "gpt4.1")
+	ModelName        string // provided to the service provide to specify which model to use (e.g. "gpt-4.1-2025-04-14")
+	URL              string
+	APIKeyEnv        string // environment variable name for the API key
+	IsReasoningModel bool   // whether this model is a reasoning model (e.g. O3, O4-mini)
 }
 
 var (
@@ -306,8 +306,8 @@ var (
 	// Skaband-specific model names.
 	// Provider details (URL and APIKeyEnv) are handled by skaband
 	Qwen = Model{
-		UserName:           "qwen",
-		ModelName:          "qwen", // skaband will map this to the actual provider model
+		UserName:  "qwen",
+		ModelName: "qwen", // skaband will map this to the actual provider model
 	}
 	GLM = Model{
 		UserName:  "glm",
@@ -676,7 +676,7 @@ func toLLMContents(msg openai.ChatCompletionMessage) []llm.Content {
 // with prompt_tokens_details.cached_tokens as the cached subset.
 // Our Usage struct follows Anthropic's convention where InputTokens is the non-cached
 // portion and TotalInputTokens() = InputTokens + CacheCreationInputTokens + CacheReadInputTokens.
-func (s *Service) toLLMUsage(au openai.Usage, headers http.Header) llm.Usage {
+func (s *Service) toLLMUsage(au openai.Usage) llm.Usage {
 	totalIn := uint64(au.PromptTokens)
 	var cached uint64
 	if au.PromptTokensDetails != nil {
@@ -688,7 +688,7 @@ func (s *Service) toLLMUsage(au openai.Usage, headers http.Header) llm.Usage {
 		CacheReadInputTokens: cached,
 		OutputTokens:         out,
 	}
-	u.CostUSD = llm.CostUSDFromResponse(headers)
+	u.CostUSD = costUSD(s.Model.ModelName, u)
 	return u
 }
 
@@ -705,7 +705,7 @@ func (s *Service) toLLMResponse(r *openai.ChatCompletionResponse) *llm.Response 
 			ID:    r.ID,
 			Model: r.Model,
 			Role:  llm.MessageRoleAssistant,
-			Usage: s.toLLMUsage(r.Usage, r.Header()),
+			Usage: s.toLLMUsage(r.Usage),
 		}
 	}
 
@@ -718,7 +718,7 @@ func (s *Service) toLLMResponse(r *openai.ChatCompletionResponse) *llm.Response 
 		Role:       toRoleFromString(choice.Message.Role),
 		Content:    toLLMContents(choice.Message),
 		StopReason: toStopReason(string(choice.FinishReason)),
-		Usage:      s.toLLMUsage(r.Usage, r.Header()),
+		Usage:      s.toLLMUsage(r.Usage),
 	}
 }
 
