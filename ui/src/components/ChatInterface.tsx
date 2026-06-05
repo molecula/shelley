@@ -214,6 +214,22 @@ function CwdDropZone({ cwd }: { cwd: string }) {
   );
 }
 
+function formatSessionCost(cost: number): string {
+  return `$${cost.toFixed(2)}`;
+}
+
+function SessionCost({ cost }: { cost: number }) {
+  return (
+    <span
+      className="session-cost"
+      title="Total spent this session (USD)"
+      data-testid="session-cost"
+    >
+      {formatSessionCost(cost)}
+    </span>
+  );
+}
+
 interface ContextUsageBarProps {
   contextWindowSize: number;
   maxContextTokens: number;
@@ -1000,6 +1016,7 @@ function ChatInterface({
   }, [messages]);
 
   const [contextWindowSize, setContextWindowSize] = useState(0);
+  const [sessionCostUsd, setSessionCostUsd] = useState(0);
   // Tool progress: maps tool_use_id -> partial output
   const [toolProgress, setToolProgress] = useState<Record<string, ToolProgress>>({});
   // Streaming LLM text: accumulated text from stream deltas
@@ -1197,6 +1214,7 @@ function ChatInterface({
       // No conversation yet, show empty state
       setMessages([]);
       setContextWindowSize(0);
+      setSessionCostUsd(0);
       setToolProgress({});
       setStreamingText("");
       if (loadingProgressDelayRef.current) {
@@ -1418,6 +1436,7 @@ function ChatInterface({
       setLastKnownMessageCount(cached.messages.length);
       messageCountStore.save(cached.messages.length);
       setContextWindowSize(cached.contextWindowSize);
+      setSessionCostUsd(cached.sessionCostUsd);
       lastSequenceIdRef.current = cached.lastSequenceId;
       loadingRef.current = false;
       setLoading(false);
@@ -1470,6 +1489,7 @@ function ChatInterface({
       // Always update context window size when loading a conversation.
       // If omitted from response (due to omitempty when 0), default to 0.
       setContextWindowSize(response.context_window_size ?? 0);
+      setSessionCostUsd(response.session_cost_usd ?? 0);
       if (onConversationUpdate) {
         onConversationUpdate(response.conversation);
       }
@@ -1670,6 +1690,17 @@ function ChatInterface({
             conversationCache.updateContextWindowSize(
               conversationId,
               streamResponse.context_window_size,
+            );
+          }
+        }
+
+        if (typeof streamResponse.session_cost_usd === "number") {
+          setSessionCostUsd(streamResponse.session_cost_usd);
+          // Keep cache in sync
+          if (conversationId) {
+            conversationCache.updateSessionCostUsd(
+              conversationId,
+              streamResponse.session_cost_usd,
             );
           }
         }
@@ -2322,6 +2353,7 @@ function ChatInterface({
             <CwdDropZone cwd={currentConversation.cwd} />
           )}
           {currentConversation?.pr_info && <PRBadge pr={currentConversation.pr_info} />}
+          <SessionCost cost={sessionCostUsd} />
           <ContextUsageBar
             contextWindowSize={contextWindowSize}
             maxContextTokens={
@@ -2458,6 +2490,7 @@ function ChatInterface({
             <CwdDropZone cwd={currentConversation.cwd} />
           )}
           {currentConversation?.pr_info && <PRBadge pr={currentConversation.pr_info} />}
+          <SessionCost cost={sessionCostUsd} />
           <ContextUsageBar
             contextWindowSize={contextWindowSize}
             maxContextTokens={

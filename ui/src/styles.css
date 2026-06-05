@@ -4193,6 +4193,14 @@ svg {
   min-width: 0;
 }
 
+.session-cost {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: default;
+}
+
 .status-cwd {
   font-size: 0.75rem;
   color: var(--text-secondary);

@@ -237,7 +237,8 @@ func WithTxRes[T any](db *DB, ctx context.Context, fn func(*generated.Queries) (
 // ConversationOptions holds extensible conversation settings stored as JSON.
 type ConversationOptions struct {
 	Type            string `json:"type,omitempty"`             // "normal" (default) or "orchestrator"
-	SubagentBackend string `json:"subagent_backend,omitempty"` // "shelley" (default), "claude-cli", "codex-cli"
+	SubagentBackend string  `json:"subagent_backend,omitempty"` // "shelley" (default), "claude-cli", "codex-cli"
+	BaseCostUSD     float64 `json:"base_cost_usd,omitempty"`     // seed cost (USD) carried over from a distilled source conversation
 }
 
 // IsOrchestrator returns true if the conversation is in orchestrator mode.
