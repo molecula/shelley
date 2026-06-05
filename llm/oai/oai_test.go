@@ -769,7 +769,7 @@ func TestToLLMUsage(t *testing.T) {
 		PromptTokens:     100,
 		CompletionTokens: 50,
 	}
-	usage := service.toLLMUsage(openaiUsage, nil)
+	usage := service.toLLMUsage(openaiUsage)
 	if usage.InputTokens != 100 {
 		t.Errorf("toLLMUsage().InputTokens = %d, expected 100", usage.InputTokens)
 	}
@@ -788,7 +788,7 @@ func TestToLLMUsage(t *testing.T) {
 			CachedTokens: 25,
 		},
 	}
-	usage = service.toLLMUsage(openaiUsageWithDetails, nil)
+	usage = service.toLLMUsage(openaiUsageWithDetails)
 	// InputTokens should be non-cached portion: 100 - 25 = 75
 	if usage.InputTokens != 75 {
 		t.Errorf("toLLMUsage().InputTokens = %d, expected 75", usage.InputTokens)

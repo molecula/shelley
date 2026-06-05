@@ -4,15 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"testing"
 )
 
 // mockService implements Service interface for testing
 // mockService implements Service interface for testing
 type mockService struct {
-	tokenContextWindow   int
-	maxImageDimension    int
+	tokenContextWindow int
+	maxImageDimension  int
 }
 
 func (m *mockService) Do(ctx context.Context, req *Request) (*Response, error) {
@@ -91,7 +90,6 @@ func TestEmptySchema(t *testing.T) {
 		t.Errorf("EmptySchema() = %s, want %s", string(schema), expected)
 	}
 }
-
 
 func TestStringContent(t *testing.T) {
 	text := "test content"
@@ -419,52 +417,29 @@ func TestContentsAttr(t *testing.T) {
 	}
 }
 
-func TestCostUSDFromResponse(t *testing.T) {
-	tests := []struct {
-		name     string
-		headers  map[string]string
-		wantCost float64
-	}{
-		{
-			name: "valid cost header",
-			headers: map[string]string{
-				"Exedev-Gateway-Cost": "0.050000",
-			},
-			wantCost: 0.05,
-		},
-		{
-			name: "invalid cost header",
-			headers: map[string]string{
-				"Exedev-Gateway-Cost": "invalid",
-			},
-			wantCost: 0,
-		},
-		{
-			name:     "missing cost header",
-			headers:  map[string]string{},
-			wantCost: 0,
-		},
-		{
-			name: "empty cost header",
-			headers: map[string]string{
-				"Exedev-Gateway-Cost": "",
-			},
-			wantCost: 0,
-		},
+func TestModelPriceCostUSD(t *testing.T) {
+	// Opus-tier pricing: $15/MTok in, $75/MTok out, $18.75 cache write, $1.50 cache read.
+	price := ModelPrice{Input: 15, Output: 75, CacheWrite: 18.75, CacheRead: 1.5}
+	usage := Usage{
+		InputTokens:              1_000_000,
+		OutputTokens:             1_000_000,
+		CacheCreationInputTokens: 1_000_000,
+		CacheReadInputTokens:     1_000_000,
+	}
+	want := 15.0 + 75.0 + 18.75 + 1.5
+	if got := price.CostUSD(usage); got != want {
+		t.Errorf("CostUSD() = %f, want %f", got, want)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			headers := make(http.Header)
-			for k, v := range tt.headers {
-				headers.Set(k, v)
-			}
+	// Zero usage costs nothing.
+	if got := price.CostUSD(Usage{}); got != 0 {
+		t.Errorf("CostUSD(zero) = %f, want 0", got)
+	}
 
-			cost := CostUSDFromResponse(headers)
-			if cost != tt.wantCost {
-				t.Errorf("CostUSDFromResponse() = %f, want %f", cost, tt.wantCost)
-			}
-		})
+	// Partial token counts scale linearly.
+	half := ModelPrice{Input: 10}.CostUSD(Usage{InputTokens: 500_000})
+	if half != 5.0 {
+		t.Errorf("CostUSD(500k @ $10/MTok) = %f, want 5.0", half)
 	}
 }
 
