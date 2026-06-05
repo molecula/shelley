@@ -7,6 +7,7 @@ import { Message, StreamResponse, Conversation } from "../types";
 export interface CachedConversation {
   messages: Message[];
   contextWindowSize: number;
+  sessionCostUsd: number;
   conversation: Conversation;
   /** The highest sequence_id we've seen, used for SSE resume */
   lastSequenceId: number;
@@ -58,6 +59,7 @@ export class ConversationCache {
     this.cache.set(conversationId, {
       messages: response.messages ?? [],
       contextWindowSize: response.context_window_size ?? 0,
+      sessionCostUsd: response.session_cost_usd ?? 0,
       conversation: response.conversation,
       lastSequenceId,
     });
@@ -100,6 +102,14 @@ export class ConversationCache {
     const entry = this.peek(conversationId);
     if (entry) {
       entry.contextWindowSize = size;
+    }
+  }
+
+  /** Update session cost (USD) for a cached conversation. */
+  updateSessionCostUsd(conversationId: string, cost: number): void {
+    const entry = this.peek(conversationId);
+    if (entry) {
+      entry.sessionCostUsd = cost;
     }
   }
 

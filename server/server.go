@@ -71,6 +71,8 @@ type StreamResponse struct {
 	Conversation      generated.Conversation `json:"conversation"`
 	ConversationState *ConversationState     `json:"conversation_state,omitempty"`
 	ContextWindowSize uint64                 `json:"context_window_size,omitempty"`
+	// SessionCostUSD is the total USD spent in this conversation (base + all messages).
+	SessionCostUSD float64 `json:"session_cost_usd,omitempty"`
 	// ConversationListUpdate is set when another conversation in the list changed
 	ConversationListUpdate *ConversationListUpdate `json:"conversation_list_update,omitempty"`
 	// Heartbeat indicates this is a heartbeat message (no new data, just keeping connection alive)
@@ -213,6 +215,42 @@ func calculateContextWindowSizeFromMsg(msg *generated.Message) uint64 {
 		return 0
 	}
 	return usage.ContextWindowUsed()
+}
+
+// sessionCostForConversation computes the authoritative total USD spent in a
+// conversation: the base cost carried over from a distilled source (stored in
+// conversation options) plus the cost of every persisted message.
+func (s *Server) sessionCostForConversation(ctx context.Context, conversationID string, conv generated.Conversation) float64 {
+	messages, err := s.db.ListMessages(ctx, conversationID)
+	if err != nil {
+		s.logger.Error("Failed to list messages for session cost", "conversationID", conversationID, "error", err)
+		return 0
+	}
+	baseCost := db.ParseConversationOptions(conv.ConversationOptions).BaseCostUSD
+	return calculateSessionCost(toAPIMessages(messages), baseCost)
+}
+
+// sumMessageCosts returns the total cost_usd across all messages' usage data.
+// Messages without usage data (user/tool messages) contribute 0.
+func sumMessageCosts(messages []APIMessage) float64 {
+	var total float64
+	for _, msg := range messages {
+		if msg.UsageData == nil {
+			continue
+		}
+		var usage llm.Usage
+		if err := json.Unmarshal([]byte(*msg.UsageData), &usage); err != nil {
+			continue
+		}
+		total += usage.CostUSD
+	}
+	return total
+}
+
+// calculateSessionCost returns the total USD spent in a conversation: a base
+// cost carried over from a distilled source plus the cost of every message.
+func calculateSessionCost(messages []APIMessage, baseCost float64) float64 {
+	return baseCost + sumMessageCosts(messages)
 }
 
 // ConversationListUpdate represents an update to the conversation list
@@ -985,7 +1023,13 @@ func (s *Server) notifySubscribersNewMessage(ctx context.Context, conversationID
 		go manager.drainPendingMessages(s)
 	}
 
-	// Publish only the new message
+	// Publish only the new message. When this message carries cost (agent
+	// messages), include the authoritative running session cost so the UI
+	// stays correct across reloads and navigation.
+	var sessionCost float64
+	if calculateContextWindowSizeFromMsg(newMsg) > 0 || newMsg.UsageData != nil {
+		sessionCost = s.sessionCostForConversation(ctx, conversationID, conversation)
+	}
 	streamData := StreamResponse{
 		Messages:     apiMessages,
 		Conversation: conversation,
@@ -993,6 +1037,7 @@ func (s *Server) notifySubscribersNewMessage(ctx context.Context, conversationID
 		// With omitempty, 0 is omitted from JSON, so the UI keeps its cached value.
 		// Only agent messages have usage data, so context window updates when they arrive.
 		ContextWindowSize: calculateContextWindowSizeFromMsg(newMsg),
+		SessionCostUSD:    sessionCost,
 	}
 	manager.subpub.Publish(newMsg.SequenceID, streamData)
 

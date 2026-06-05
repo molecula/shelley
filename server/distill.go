@@ -110,6 +110,10 @@ func (s *Server) handleDistillConversation(w http.ResponseWriter, r *http.Reques
 		modelID = s.defaultModel
 	}
 
+	// Carry over the source conversation's total cost so the new conversation
+	// continues iterating on the running spend.
+	baseCost := calculateSessionCost(toAPIMessages(messages), db.ParseConversationOptions(sourceConv.ConversationOptions).BaseCostUSD)
+
 	// Create new conversation
 	var cwdPtr *string
 	if req.Cwd != "" {
@@ -117,7 +121,7 @@ func (s *Server) handleDistillConversation(w http.ResponseWriter, r *http.Reques
 	} else if sourceConv.Cwd != nil {
 		cwdPtr = sourceConv.Cwd
 	}
-	conversation, err := s.db.CreateConversation(ctx, nil, true, cwdPtr, &modelID, db.ConversationOptions{})
+	conversation, err := s.db.CreateConversation(ctx, nil, true, cwdPtr, &modelID, db.ConversationOptions{BaseCostUSD: baseCost})
 	if err != nil {
 		s.logger.Error("Failed to create conversation", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -400,6 +404,10 @@ func (s *Server) handleDistillReplace(w http.ResponseWriter, r *http.Request) {
 		modelID = s.defaultModel
 	}
 
+	// Carry over the source conversation's total cost so the replacement
+	// conversation continues iterating on the running spend.
+	baseCost := calculateSessionCost(toAPIMessages(messages), db.ParseConversationOptions(sourceConv.ConversationOptions).BaseCostUSD)
+
 	// Create new conversation (slug=nil, will be set after distillation)
 	var cwdPtr *string
 	if req.Cwd != "" {
@@ -407,7 +415,7 @@ func (s *Server) handleDistillReplace(w http.ResponseWriter, r *http.Request) {
 	} else if sourceConv.Cwd != nil {
 		cwdPtr = sourceConv.Cwd
 	}
-	conversation, err := s.db.CreateConversation(ctx, nil, true, cwdPtr, &modelID, db.ConversationOptions{})
+	conversation, err := s.db.CreateConversation(ctx, nil, true, cwdPtr, &modelID, db.ConversationOptions{BaseCostUSD: baseCost})
 	if err != nil {
 		s.logger.Error("Failed to create conversation", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
