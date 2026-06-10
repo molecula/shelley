@@ -114,7 +114,6 @@ const (
     "limit": {
       "type": "integer",
       "description": "Max number of messages to return"
-    }
     },
     "query": {
       "type": "string",
