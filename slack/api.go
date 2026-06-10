@@ -129,3 +129,38 @@ func (b *Bot) ResolveChannel(ctx context.Context, nameOrID string) (string, erro
 func (b *Bot) AddReaction(ctx context.Context, channel, timestamp, emoji string) error {
 	return b.api.AddReactionContext(ctx, emoji, slack.NewRefToMessage(channel, timestamp))
 }
+
+// ListUsers returns all users in the workspace.
+func (b *Bot) ListUsers(ctx context.Context) ([]claudetool.SlackUser, error) {
+	users, err := b.api.GetUsersContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get users: %w", err)
+	}
+	result := make([]claudetool.SlackUser, 0, len(users))
+	for _, u := range users {
+		if u.Deleted || u.IsBot {
+			continue
+		}
+		result = append(result, toSlackUser(u))
+	}
+	return result, nil
+}
+
+// LookupUserByEmail returns the user with the given email address.
+func (b *Bot) LookupUserByEmail(ctx context.Context, email string) (claudetool.SlackUser, error) {
+	u, err := b.api.GetUserByEmailContext(ctx, email)
+	if err != nil {
+		return claudetool.SlackUser{}, fmt.Errorf("get user by email: %w", err)
+	}
+	return toSlackUser(*u), nil
+}
+
+func toSlackUser(u slack.User) claudetool.SlackUser {
+	return claudetool.SlackUser{
+		ID:          u.ID,
+		Name:        u.Name,
+		RealName:    u.RealName,
+		DisplayName: u.Profile.DisplayName,
+		Email:       u.Profile.Email,
+	}
+}

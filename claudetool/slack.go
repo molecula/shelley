@@ -17,6 +17,8 @@ type SlackAPI interface {
 	GetThread(ctx context.Context, channel, threadTS string, limit int) ([]SlackMessage, error)
 	ListChannels(ctx context.Context) ([]SlackChannel, error)
 	AddReaction(ctx context.Context, channel, timestamp, emoji string) error
+	ListUsers(ctx context.Context) ([]SlackUser, error)
+	LookupUserByEmail(ctx context.Context, email string) (SlackUser, error)
 }
 
 // SlackMessage is a simplified Slack message for tool output.
@@ -31,6 +33,15 @@ type SlackMessage struct {
 type SlackChannel struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// SlackUser is a simplified Slack user for tool output.
+type SlackUser struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`        // username (handle)
+	RealName    string `json:"real_name,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	Email       string `json:"email,omitempty"`
 }
 
 // SlackTool provides Slack integration tools for Claude.
@@ -60,7 +71,16 @@ const (
 
 - action: "add_reaction"
   Add an emoji reaction to a message.
-  Parameters: channel (string, required), timestamp (string, required), emoji (string, required)`
+  Parameters: channel (string, required), timestamp (string, required), emoji (string, required)
+
+- action: "find_users"
+  Search workspace users by name, display name, or username to get their IDs and handles.
+  To @-mention someone in a message, use their ID in the form <@U012345>.
+  Parameters: query (string, required)
+
+- action: "lookup_user_by_email"
+  Look up a single user by their exact email address.
+  Parameters: email (string, required)`
 
 	slackToolInputSchema = `{
   "type": "object",
@@ -68,7 +88,7 @@ const (
   "properties": {
     "action": {
       "type": "string",
-      "enum": ["send_message", "get_history", "get_thread", "list_channels", "add_reaction"],
+      "enum": ["send_message", "get_history", "get_thread", "list_channels", "add_reaction", "find_users", "lookup_user_by_email"],
       "description": "The Slack action to perform"
     },
     "channel": {
@@ -95,6 +115,15 @@ const (
       "type": "integer",
       "description": "Max number of messages to return"
     }
+    },
+    "query": {
+      "type": "string",
+      "description": "Search query for find_users (matches name, display name, or username)"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email address for lookup_user_by_email"
+    }
   }
 }`
 )
@@ -106,6 +135,8 @@ type slackInput struct {
 	ThreadTS string `json:"thread_ts"`
 	Timestamp string `json:"timestamp"`
 	Emoji    string `json:"emoji"`
+	Query    string `json:"query"`
+	Email    string `json:"email"`
 	Limit    int    `json:"limit"`
 }
 
@@ -136,6 +167,10 @@ func (s *SlackTool) Run(ctx context.Context, m json.RawMessage) llm.ToolOut {
 		return s.listChannels(ctx)
 	case "add_reaction":
 		return s.addReaction(ctx, req)
+	case "find_users":
+		return s.findUsers(ctx, req)
+	case "lookup_user_by_email":
+		return s.lookupUserByEmail(ctx, req)
 	default:
 		return llm.ErrorfToolOut("unknown slack action: %s", req.Action)
 	}
@@ -227,6 +262,57 @@ func (s *SlackTool) addReaction(ctx context.Context, req slackInput) llm.ToolOut
 		return llm.ErrorfToolOut("add reaction: %v", err)
 	}
 	return llm.ToolOut{LLMContent: llm.TextContent("Reaction added.")}
+}
+
+func (s *SlackTool) findUsers(ctx context.Context, req slackInput) llm.ToolOut {
+	if req.Query == "" {
+		return llm.ErrorfToolOut("query is required")
+	}
+	users, err := s.API.ListUsers(ctx)
+	if err != nil {
+		return llm.ErrorfToolOut("list users: %v", err)
+	}
+	q := strings.ToLower(req.Query)
+	var matches []SlackUser
+	for _, u := range users {
+		if strings.Contains(strings.ToLower(u.Name), q) ||
+			strings.Contains(strings.ToLower(u.RealName), q) ||
+			strings.Contains(strings.ToLower(u.DisplayName), q) {
+			matches = append(matches, u)
+		}
+	}
+	if len(matches) == 0 {
+		return llm.ToolOut{LLMContent: llm.TextContent(fmt.Sprintf("No users found matching %q.", req.Query))}
+	}
+	return llm.ToolOut{LLMContent: llm.TextContent(formatUsers(matches))}
+}
+
+func (s *SlackTool) lookupUserByEmail(ctx context.Context, req slackInput) llm.ToolOut {
+	if req.Email == "" {
+		return llm.ErrorfToolOut("email is required")
+	}
+	u, err := s.API.LookupUserByEmail(ctx, req.Email)
+	if err != nil {
+		return llm.ErrorfToolOut("lookup user by email: %v", err)
+	}
+	return llm.ToolOut{LLMContent: llm.TextContent(formatUsers([]SlackUser{u}))}
+}
+
+func formatUsers(users []SlackUser) string {
+	var sb strings.Builder
+	for _, u := range users {
+		fmt.Fprintf(&sb, "%s  @%s", u.ID, u.Name)
+		if u.DisplayName != "" && u.DisplayName != u.Name {
+			fmt.Fprintf(&sb, "  (%s)", u.DisplayName)
+		} else if u.RealName != "" {
+			fmt.Fprintf(&sb, "  (%s)", u.RealName)
+		}
+		if u.Email != "" {
+			fmt.Fprintf(&sb, "  <%s>", u.Email)
+		}
+		fmt.Fprintf(&sb, "  — mention with <@%s>\n", u.ID)
+	}
+	return sb.String()
 }
 
 func formatMessages(msgs []SlackMessage) string {

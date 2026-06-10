@@ -58,6 +58,20 @@ func (f *fakeSlackAPI) AddReaction(_ context.Context, channel, timestamp, emoji 
 	return nil
 }
 
+func (f *fakeSlackAPI) ListUsers(_ context.Context) ([]SlackUser, error) {
+	return []SlackUser{
+		{ID: "U123", Name: "alice", RealName: "Alice Smith", DisplayName: "alice"},
+		{ID: "U456", Name: "bob", RealName: "Bob Jones", DisplayName: "bobby"},
+	}, nil
+}
+
+func (f *fakeSlackAPI) LookupUserByEmail(_ context.Context, email string) (SlackUser, error) {
+	if email == "alice@example.com" {
+		return SlackUser{ID: "U123", Name: "alice", Email: email}, nil
+	}
+	return SlackUser{}, fmt.Errorf("user not found")
+}
+
 func TestSlackTool(t *testing.T) {
 	api := &fakeSlackAPI{}
 	tool := &SlackTool{API: api}
@@ -80,6 +94,12 @@ func TestSlackTool(t *testing.T) {
 		{"list_channels", slackInput{Action: "list_channels"}, false},
 		{"add_reaction", slackInput{Action: "add_reaction", Channel: "C001", Timestamp: "123.456", Emoji: "thumbsup"}, false},
 		{"add_reaction_fail", slackInput{Action: "add_reaction", Channel: "C001", Timestamp: "123.456", Emoji: "fail"}, true},
+		{"find_users", slackInput{Action: "find_users", Query: "alice"}, false},
+		{"find_users_realname", slackInput{Action: "find_users", Query: "jones"}, false},
+		{"find_users_no_query", slackInput{Action: "find_users"}, true},
+		{"lookup_user_by_email", slackInput{Action: "lookup_user_by_email", Email: "alice@example.com"}, false},
+		{"lookup_user_by_email_notfound", slackInput{Action: "lookup_user_by_email", Email: "nobody@example.com"}, true},
+		{"lookup_user_by_email_no_email", slackInput{Action: "lookup_user_by_email"}, true},
 		{"unknown_action", slackInput{Action: "bogus"}, true},
 	}
 
