@@ -7,10 +7,10 @@ import (
 )
 
 func TestCostUSD(t *testing.T) {
-	// 1M output tokens on an Opus model = $75.
+	// 1M output tokens on an Opus model = $25.
 	got := costUSD(Claude48Opus, llm.Usage{OutputTokens: 1_000_000})
-	if got != 75 {
-		t.Errorf("Opus 1M output: costUSD = %f, want 75", got)
+	if got != 25 {
+		t.Errorf("Opus 1M output: costUSD = %f, want 25", got)
 	}
 
 	// 1M input tokens on a Sonnet model = $3.
@@ -19,11 +19,11 @@ func TestCostUSD(t *testing.T) {
 		t.Errorf("Sonnet 1M input: costUSD = %f, want 3", got)
 	}
 
-	// Every Opus model shares the standard $15/$75 tier.
+	// Every Opus model shares the standard $5/$25 tier.
 	for _, m := range []string{Claude45Opus, Claude46Opus, Claude47Opus, Claude48Opus} {
 		c := costUSD(m, llm.Usage{InputTokens: 1_000_000, OutputTokens: 1_000_000})
-		if c != 90 {
-			t.Errorf("%s: costUSD = %f, want 90", m, c)
+		if c != 30 {
+			t.Errorf("%s: costUSD = %f, want 30", m, c)
 		}
 	}
 
