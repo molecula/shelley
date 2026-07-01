@@ -32,10 +32,34 @@
   <div :class="`drawer ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`">
     <!-- Header -->
     <div class="drawer-header">
-      <h2 class="drawer-title">{{ showArchived ? t("archived") : t("conversations") }}</h2>
+      <div class="drawer-mode-tabs" role="tablist">
+        <button
+          role="tab"
+          :aria-selected="drawerMode === 'conversations' && !showArchived"
+          :class="`drawer-mode-tab${drawerMode === 'conversations' && !showArchived ? ' active' : ''}`"
+          @click="
+            setDrawerMode('conversations');
+            showArchived = false;
+          "
+        >
+          {{ showArchived ? t("archived") : t("conversations") }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="drawerMode === 'library'"
+          :class="`drawer-mode-tab${drawerMode === 'library' ? ' active' : ''}`"
+          @click="setDrawerMode('library')"
+        >
+          {{ t("library") }}
+        </button>
+      </div>
       <div class="drawer-header-actions">
         <!-- Group by button -->
-        <div v-if="!showArchived" ref="groupMenuRef" class="group-by-wrapper">
+        <div
+          v-if="!showArchived && drawerMode === 'conversations'"
+          ref="groupMenuRef"
+          class="group-by-wrapper"
+        >
           <button
             :class="`btn-icon${groupBy !== 'none' || sortBy !== 'activity' ? ' group-by-active' : ''}`"
             :aria-label="t('groupConversations')"
@@ -106,7 +130,7 @@
         </div>
         <!-- New conversation button - mobile only -->
         <button
-          v-if="!showArchived"
+          v-if="!showArchived && drawerMode === 'conversations'"
           class="btn-icon hide-on-desktop"
           :aria-label="t('newConversation')"
           @click="onNewConversationClick"
@@ -153,8 +177,8 @@
       </div>
     </div>
 
-    <!-- Search bar -->
-    <div class="drawer-search">
+    <!-- Search bar (conversations only) -->
+    <div v-if="drawerMode === 'conversations'" class="drawer-search">
       <svg
         class="drawer-search-icon"
         fill="none"
@@ -191,8 +215,31 @@
       </button>
     </div>
 
-    <!-- Conversations list -->
+    <!-- Body: conversation list, or the Library pane (Skills | Commands) -->
     <div class="drawer-body scrollable">
+      <div v-if="drawerMode === 'library'" class="library-pane">
+        <div class="library-section-tabs" role="tablist">
+          <button
+            role="tab"
+            :aria-selected="librarySection === 'skills'"
+            :class="`library-section-tab${librarySection === 'skills' ? ' active' : ''}`"
+            @click="setLibrarySection('skills')"
+          >
+            {{ t("skills") }}
+          </button>
+          <button
+            role="tab"
+            :aria-selected="librarySection === 'commands'"
+            :class="`library-section-tab${librarySection === 'commands' ? ' active' : ''}`"
+            @click="setLibrarySection('commands')"
+          >
+            {{ t("commands") }}
+          </button>
+        </div>
+        <SkillsList v-if="librarySection === 'skills'" :cwd="libraryCwd" />
+        <UserCommandsList v-else :cwd="libraryCwd" />
+      </div>
+      <template v-else>
       <div
         v-if="isSearching && searching && searchResults === null"
         class="text-secondary drawer-empty-state"
@@ -263,10 +310,11 @@
           :conversation="conv"
         />
       </div>
+      </template>
     </div>
 
-    <!-- Footer with archived toggle -->
-    <div class="drawer-footer">
+    <!-- Footer with archived toggle (hidden in library mode) -->
+    <div v-if="drawerMode === 'conversations'" class="drawer-footer">
       <button class="btn-secondary drawer-footer-button" @click="showArchived = !showArchived">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="drawer-icon-size">
           <path
@@ -307,6 +355,8 @@ import {
 import { tildifyPath } from "../../utils/tildify";
 import { handleModifiedNavClick } from "../utils/openInNewTab";
 import ConversationRow from "./ConversationDrawerRow.vue";
+import SkillsList from "./SkillsList.vue";
+import UserCommandsList from "./UserCommandsList.vue";
 import { DrawerCtxKey, type GroupBy, parseTags } from "./conversationDrawerShared";
 
 const props = defineProps<{
@@ -354,6 +404,32 @@ function handleAuxClick(e: MouseEvent, conversation: Conversation) {
 }
 
 // --- State ---
+// Top-level drawer view: the conversation list, or the commands/skills Library.
+// Persisted like the group/sort prefs. Migrate an old "skills" value to
+// "library" (matches the React drawer's migration).
+type DrawerMode = "conversations" | "library";
+const drawerMode = ref<DrawerMode>(
+  (() => {
+    const stored = localStorage.getItem("shelley-drawer-mode");
+    return stored === "library" || stored === "skills" ? "library" : "conversations";
+  })(),
+);
+function setDrawerMode(mode: DrawerMode) {
+  drawerMode.value = mode;
+  localStorage.setItem("shelley-drawer-mode", mode);
+}
+type LibrarySection = "skills" | "commands";
+const librarySection = ref<LibrarySection>(
+  localStorage.getItem("shelley-library-section") === "commands" ? "commands" : "skills",
+);
+function setLibrarySection(section: LibrarySection) {
+  librarySection.value = section;
+  localStorage.setItem("shelley-library-section", section);
+}
+// Scope Library discovery to the viewed conversation's cwd when available so
+// project-local skills/commands show up; otherwise the server uses its own cwd.
+const libraryCwd = computed(() => props.viewedConversation?.cwd || undefined);
+
 const showArchived = ref(false);
 const archivedConversations = ref<Conversation[]>([]);
 const loadingArchived = ref(false);

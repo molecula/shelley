@@ -81,6 +81,17 @@ export const upgoer5: TranslationKeys = {
   setWorkingDirToMainRepo: "Set work place to the main git code home",
 
   // Conversation Drawer
+  // Library (commands + skills)
+  library: "Library",
+  skills: "Skills",
+  commands: "Commands",
+  failedToLoad: "Failed to load",
+  noUserSkills: "No user-defined skills found.",
+  skillsListHint: "Drop a SKILL.md into ~/.config/shelley/<name>/ or .claude/skills/<name>/.",
+  noUserCommands: "No user-defined commands found.",
+  commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
+  argumentHint: "Argument hint",
+
   archived: "Put Away",
   noArchivedConversations: "No talks put away",
   noConversationsYet: "No talks yet",

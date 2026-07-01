@@ -80,6 +80,17 @@ export interface TranslationKeys {
   setWorkingDirToRepoRoot: string;
   setWorkingDirToMainRepo: string;
 
+  // Library (commands + skills)
+  library: string;
+  skills: string;
+  commands: string;
+  failedToLoad: string;
+  noUserSkills: string;
+  skillsListHint: string;
+  noUserCommands: string;
+  commandsListHint: string;
+  argumentHint: string;
+
   // Conversation Drawer
   archived: string;
   noArchivedConversations: string;

@@ -81,6 +81,17 @@ export const ja: TranslationKeys = {
   setWorkingDirToMainRepo: "作業ディレクトリを git メインワークツリーのルートに設定する",
 
   // Conversation Drawer
+  // Library (commands + skills)
+  library: "Library",
+  skills: "Skills",
+  commands: "Commands",
+  failedToLoad: "Failed to load",
+  noUserSkills: "No user-defined skills found.",
+  skillsListHint: "Drop a SKILL.md into ~/.config/shelley/<name>/ or .claude/skills/<name>/.",
+  noUserCommands: "No user-defined commands found.",
+  commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
+  argumentHint: "Argument hint",
+
   archived: "アーカイブ済み",
   noArchivedConversations: "アーカイブされた会話はありません",
   noConversationsYet: "会話はまだありません",

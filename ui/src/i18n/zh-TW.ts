@@ -81,6 +81,17 @@ export const zhTW: TranslationKeys = {
   setWorkingDirToMainRepo: "將工作目錄設定為 git 主工作樹根目錄",
 
   // Conversation Drawer
+  // Library (commands + skills)
+  library: "Library",
+  skills: "Skills",
+  commands: "Commands",
+  failedToLoad: "Failed to load",
+  noUserSkills: "No user-defined skills found.",
+  skillsListHint: "Drop a SKILL.md into ~/.config/shelley/<name>/ or .claude/skills/<name>/.",
+  noUserCommands: "No user-defined commands found.",
+  commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
+  argumentHint: "Argument hint",
+
   archived: "已封存",
   noArchivedConversations: "沒有已封存的對話",
   noConversationsYet: "尚無對話",

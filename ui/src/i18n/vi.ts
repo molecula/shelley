@@ -81,6 +81,17 @@ export const vi: TranslationKeys = {
   setWorkingDirToMainRepo: "Đặt thư mục làm việc về gốc worktree chính của git",
 
   // Conversation Drawer
+  // Library (commands + skills)
+  library: "Library",
+  skills: "Skills",
+  commands: "Commands",
+  failedToLoad: "Failed to load",
+  noUserSkills: "No user-defined skills found.",
+  skillsListHint: "Drop a SKILL.md into ~/.config/shelley/<name>/ or .claude/skills/<name>/.",
+  noUserCommands: "No user-defined commands found.",
+  commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
+  argumentHint: "Argument hint",
+
   archived: "Danh sách lưu trữ",
   noArchivedConversations: "Chưa có hội thoại được lưu trữ",
   noConversationsYet: "Chưa có hội thoại",

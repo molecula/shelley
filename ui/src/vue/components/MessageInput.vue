@@ -311,7 +311,12 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "../composables/i18n";
 import { pickPlaceholderHint } from "../../utils/placeholderHints";
-import { SLASH_COMMANDS } from "../../utils/slashCommands";
+import {
+  SLASH_COMMANDS,
+  fetchUserSlashCommands,
+  renderUserCommand,
+  type SlashCommand,
+} from "../../utils/slashCommands";
 import { THINKING_LEVELS } from "./thinkingLevel";
 
 // Web Speech API types
@@ -723,14 +728,31 @@ const canSubmit = computed(
 );
 const isDraggingOver = computed(() => dragCounter.value > 0);
 const isShellMode = computed(() => message.value.trimStart().startsWith("!"));
+// User-defined slash commands from /api/commands, merged with the built-ins
+// below. Loaded lazily on the first "/" (and once on mount) so the composer
+// works offline/immediately with built-ins. Built-ins win on name collisions
+// (see fetchUserSlashCommands), so the dynamic list never masks a UI action.
+const userSlashCommands = ref<SlashCommand[]>([]);
+let userSlashLoaded = false;
+async function ensureUserSlashCommands() {
+  if (userSlashLoaded) return;
+  userSlashLoaded = true;
+  userSlashCommands.value = await fetchUserSlashCommands();
+}
+
+const allSlashCommands = computed<SlashCommand[]>(() => [
+  ...Object.values(SLASH_COMMANDS),
+  ...userSlashCommands.value,
+]);
+
 const slashQuery = computed(() => {
   const match = message.value.match(/^\/[a-zA-Z0-9_-]*$/);
   return match ? match[0].slice(1).toLowerCase() : null;
 });
 const slashSuggestions = computed(() => {
   if (slashQuery.value === null) return [];
-  return Object.values(SLASH_COMMANDS).filter((item) =>
-    item.command.slice(1).startsWith(slashQuery.value!),
+  return allSlashCommands.value.filter((item) =>
+    item.command.slice(1).toLowerCase().startsWith(slashQuery.value!),
   );
 });
 const exactSlashCommand = computed(() =>
@@ -831,8 +853,10 @@ watch(modelArgContext, () => {
   slashMenuSelectedIndex.value = 0;
 });
 
-watch(slashQuery, () => {
+watch(slashQuery, (q) => {
   slashMenuSelectedIndex.value = 0;
+  // Load user-defined commands the first time the user starts a slash query.
+  if (q !== null) void ensureUserSlashCommands();
 });
 
 watch(message, (value) => {
@@ -846,6 +870,23 @@ watch(message, (value) => {
 async function chooseSlashCommand(index: number) {
   const item = slashSuggestions.value[index];
   if (!item) return;
+  // User-defined commands aren't UI actions: expand the command body into the
+  // composer (substituting $ARGUMENTS / appending args) so the user can edit
+  // and send it as a normal message. The server doesn't expand `/name` itself.
+  if (item.isUserCommand) {
+    const rendered = renderUserCommand(item.body ?? "", "");
+    setMessage(rendered);
+    slashMenuDismissed.value = true;
+    requestAnimationFrame(() => {
+      const ta = textareaRef.value;
+      if (!ta) return;
+      ta.focus();
+      // Place the caret at the end so the user can keep typing arguments.
+      const end = ta.value.length;
+      ta.setSelectionRange(end, end);
+    });
+    return;
+  }
   if (!item.takesArgs) {
     setMessage("");
     slashMenuDismissed.value = true;

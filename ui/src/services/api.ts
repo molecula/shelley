@@ -669,6 +669,45 @@ class ApiService {
     return response.json();
   }
 
+  // getCommands fetches the slash-command palette payload from /api/commands:
+  // UI built-ins, user-defined commands (~/.claude/commands and project
+  // .claude/commands), and skills. `cwd` scopes project-local discovery; when
+  // omitted the server uses its own working directory.
+  async getCommands(cwd?: string): Promise<SlashCommandsResponse> {
+    const url = cwd
+      ? `${this.baseUrl}/commands?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/commands`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load slash commands: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  // getUserSkills lists all skills (user, project, builtin) for the Library.
+  async getUserSkills(cwd?: string): Promise<UserSkillSummary[]> {
+    const url = cwd
+      ? `${this.baseUrl}/user-skills?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/user-skills`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load user skills: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  // getUserSkillContent returns the full SKILL.md content for a named skill.
+  async getUserSkillContent(name: string, cwd?: string): Promise<UserSkillContent> {
+    const url = cwd
+      ? `${this.baseUrl}/user-skills/${encodeURIComponent(name)}?cwd=${encodeURIComponent(cwd)}`
+      : `${this.baseUrl}/user-skills/${encodeURIComponent(name)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load skill content: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
   // getHostIcon fetches the LLM-generated SVG icon for this host from
   // /api/host-icon. Returns the raw SVG markup, or null when the server
   // has none yet (404) or the request otherwise fails.
@@ -682,6 +721,50 @@ class ApiService {
 }
 
 export const api = new ApiService();
+
+// Slash-command palette payload (GET /api/commands). Field names mirror the Go
+// shapes in server/commands_handlers.go and commands/commands.go exactly.
+export interface SlashBuiltin {
+  name: string;
+  description: string;
+  action: string;
+}
+
+export interface SlashUserCommand {
+  name: string;
+  description: string;
+  argument_hint?: string;
+  body: string;
+  path: string;
+  scope: string;
+}
+
+export interface SlashSkill {
+  name: string;
+  description: string;
+  is_builtin: boolean;
+}
+
+export interface SlashCommandsResponse {
+  builtins: SlashBuiltin[];
+  user_commands: SlashUserCommand[];
+  skills: SlashSkill[];
+}
+
+// Skills library shapes (GET /api/user-skills and /api/user-skills/{name}).
+export interface UserSkillSummary {
+  name: string;
+  description: string;
+  path: string;
+  scope: string;
+}
+
+export interface UserSkillContent {
+  name: string;
+  description: string;
+  path: string;
+  content: string;
+}
 
 // Feature flags API. Flags are declared in Go (package featureflags); the
 // server returns the merged registry+override list. `override === undefined`

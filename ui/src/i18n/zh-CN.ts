@@ -81,6 +81,17 @@ export const zhCN: TranslationKeys = {
   setWorkingDirToMainRepo: "将工作目录设置为 git 主工作树根目录",
 
   // Conversation Drawer
+  // Library (commands + skills)
+  library: "Library",
+  skills: "Skills",
+  commands: "Commands",
+  failedToLoad: "Failed to load",
+  noUserSkills: "No user-defined skills found.",
+  skillsListHint: "Drop a SKILL.md into ~/.config/shelley/<name>/ or .claude/skills/<name>/.",
+  noUserCommands: "No user-defined commands found.",
+  commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
+  argumentHint: "Argument hint",
+
   archived: "已归档",
   noArchivedConversations: "没有已归档的对话",
   noConversationsYet: "暂无对话",
