@@ -37,7 +37,7 @@
         <!-- Group by button -->
         <div v-if="!showArchived" ref="groupMenuRef" class="group-by-wrapper">
           <button
-            :class="`btn-icon${groupBy !== 'none' ? ' group-by-active' : ''}`"
+            :class="`btn-icon${groupBy !== 'none' || sortBy !== 'activity' ? ' group-by-active' : ''}`"
             :aria-label="t('groupConversations')"
             :title="t('groupConversations')"
             @click="groupMenuOpen = !groupMenuOpen"
@@ -52,6 +52,7 @@
             </svg>
           </button>
           <div v-if="groupMenuOpen" class="group-by-menu">
+            <div class="group-by-menu-section-label">{{ t("groupConversations") }}</div>
             <button
               v-for="value in ['none', 'cwd', 'git_repo'] as GroupBy[]"
               :key="value"
@@ -62,6 +63,19 @@
               "
             >
               {{ groupByLabel(value) }}
+            </button>
+            <div class="group-by-menu-separator" />
+            <div class="group-by-menu-section-label">{{ t("sortConversations") }}</div>
+            <button
+              v-for="value in ['activity', 'created', 'name'] as SortMode[]"
+              :key="value"
+              :class="`group-by-menu-item${sortBy === value ? ' active' : ''}`"
+              @click="
+                handleSortByChange(value);
+                groupMenuOpen = false;
+              "
+            >
+              {{ sortByLabel(value) }}
             </button>
             <div class="group-by-menu-separator" />
             <button
@@ -282,11 +296,13 @@ import type { Conversation, ConversationWithState } from "../../types";
 import { api } from "../../services/api";
 import { useI18n } from "../composables/i18n";
 import {
+  sortConversations,
   sortConversationsByBucket,
   maxBucket,
   applyStableOrder,
   applyStableKeyOrder,
   neighborAfterRemoval,
+  type SortMode,
 } from "../../utils/conversationSort";
 import { tildifyPath } from "../../utils/tildify";
 import { handleModifiedNavClick } from "../utils/openInNewTab";
@@ -357,6 +373,12 @@ const groupBy = ref<GroupBy>(
   (() => {
     const stored = localStorage.getItem("shelley-group-by");
     return stored === "cwd" || stored === "git_repo" ? stored : "none";
+  })(),
+);
+const sortBy = ref<SortMode>(
+  (() => {
+    const stored = localStorage.getItem("shelley-sort-by");
+    return stored === "created" || stored === "name" ? stored : "activity";
   })(),
 );
 const collapsedGroups = ref<Set<string>>(new Set());
@@ -721,6 +743,36 @@ function groupByLabel(value: GroupBy): string {
   };
   return labels[value];
 }
+function handleSortByChange(value: SortMode) {
+  sortBy.value = value;
+  localStorage.setItem("shelley-sort-by", value);
+}
+function sortByLabel(value: SortMode): string {
+  const labels: Record<SortMode, string> = {
+    activity: t("sortByActivity"),
+    created: t("sortByCreated"),
+    name: t("sortByName"),
+  };
+  return labels[value];
+}
+
+// sortListWithOrder orders a conversation list according to the current
+// sortBy mode. For "activity" it keeps the existing bucketed + stable-order
+// behavior (via applyStableOrder against the given prev-order slot); for
+// "created" and "name" it applies the direct comparator sort with no
+// stable-order pinning (those modes don't jitter, so holding a prior order
+// isn't needed) and returns the resulting order as the new prev-order.
+function sortListWithOrder<T extends Conversation>(
+  items: readonly T[],
+  prevOrder: string[],
+): { items: T[]; order: string[] } {
+  if (sortBy.value === "activity") {
+    const sorted = sortConversationsByBucket(items);
+    return applyStableOrder(sorted, prevOrder);
+  }
+  const sorted = sortConversations(items, sortBy.value);
+  return { items: sorted, order: sorted.map((c) => c.conversation_id) };
+}
 function toggleGroup(groupKey: string) {
   const next = new Set(collapsedGroups.value);
   if (next.has(groupKey)) next.delete(groupKey);
@@ -744,10 +796,11 @@ function onNewConversationClick(e: MouseEvent) {
 const topLevelConversations = computed(() => {
   resetOrderRefsForResort();
   void resortKey.value;
-  const sorted = sortConversationsByBucket(
+  void sortBy.value;
+  const { items, order } = sortListWithOrder(
     props.conversations.filter((c) => !c.parent_conversation_id),
+    topOrder,
   );
-  const { items, order } = applyStableOrder(sorted, topOrder);
   topOrder = order;
   return items;
 });
@@ -784,8 +837,8 @@ const draftLabels = computed<Record<string, string>>(() => {
 const stableArchivedConversations = computed(() => {
   resetOrderRefsForResort();
   void resortKey.value;
-  const sorted = sortConversationsByBucket(archivedConversations.value);
-  const { items, order } = applyStableOrder(sorted, archivedOrder);
+  void sortBy.value;
+  const { items, order } = sortListWithOrder(archivedConversations.value, archivedOrder);
   archivedOrder = order;
   return items;
 });
@@ -805,6 +858,7 @@ const groupedConversations = computed<[string, Group][] | null>(() => {
   if (groupBy.value === "none" || showArchived.value || isSearching.value) return null;
   resetOrderRefsForResort();
   void resortKey.value;
+  void sortBy.value;
 
   const groups = new Map<string, Group>();
   const ungrouped: ConversationWithState[] = [];
@@ -829,22 +883,35 @@ const groupedConversations = computed<[string, Group][] | null>(() => {
 
   const nextGroupOrder: Record<string, string[]> = {};
   for (const [key, group] of groups) {
-    const sorted = sortConversationsByBucket(group.conversations);
-    const { items, order } = applyStableOrder(sorted, groupOrder[key] || []);
+    const { items, order } = sortListWithOrder(group.conversations, groupOrder[key] || []);
     group.conversations = items;
     nextGroupOrder[key] = order;
   }
 
-  const desiredKeys = [...groups.entries()]
-    .sort((a, b) => maxBucket(b[1].conversations) - maxBucket(a[1].conversations))
-    .map(([k]) => k);
-  const stableKeys = applyStableKeyOrder(desiredKeys, groupKeysOrder);
-  groupKeysOrder = stableKeys;
-  const sorted: [string, Group][] = stableKeys.map((k) => [k, groups.get(k)!]);
+  // Order groups. For "activity", keep the maxBucket + stable-key behavior.
+  // For "created"/"name", order groups by their first (already-sorted)
+  // conversation so groups follow the same sort as their contents.
+  let sorted: [string, Group][];
+  if (sortBy.value === "activity") {
+    const desiredKeys = [...groups.entries()]
+      .sort((a, b) => maxBucket(b[1].conversations) - maxBucket(a[1].conversations))
+      .map(([k]) => k);
+    const stableKeys = applyStableKeyOrder(desiredKeys, groupKeysOrder);
+    groupKeysOrder = stableKeys;
+    sorted = stableKeys.map((k) => [k, groups.get(k)!]);
+  } else {
+    const entries = [...groups.entries()].sort((a, b) => {
+      const aFirst = a[1].conversations[0];
+      const bFirst = b[1].conversations[0];
+      if (!aFirst || !bFirst) return 0;
+      return sortConversations([aFirst, bFirst], sortBy.value)[0] === aFirst ? -1 : 1;
+    });
+    groupKeysOrder = entries.map(([k]) => k);
+    sorted = entries.map(([k, g]) => [k, g]);
+  }
 
   if (ungrouped.length > 0) {
-    const ungroupedSorted = sortConversationsByBucket(ungrouped);
-    const { items, order } = applyStableOrder(ungroupedSorted, groupOrder["__ungrouped__"] || []);
+    const { items, order } = sortListWithOrder(ungrouped, groupOrder["__ungrouped__"] || []);
     nextGroupOrder["__ungrouped__"] = order;
     sorted.push(["__ungrouped__", { label: t("other"), conversations: items }]);
   }

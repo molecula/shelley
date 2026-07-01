@@ -27,6 +27,37 @@ export function sortConversationsByBucket<T extends Conversation>(convs: readonl
   });
 }
 
+// User-selectable sort mode for the conversation drawer.
+//   activity: 5-minute bucketed updated_at (the default; see sortConversationsByBucket).
+//   created:  newest-first by conversation_id (ULID encodes creation time).
+//   name:     case-insensitive ascending by slug, falling back to conversation_id.
+export type SortMode = "activity" | "created" | "name";
+
+// sortConversations returns a new array sorted according to `mode`. Does not
+// mutate the input. For "activity" it delegates to sortConversationsByBucket
+// (whose stable-order behavior the drawer preserves via applyStableOrder);
+// "created" and "name" are direct comparator sorts.
+export function sortConversations<T extends Conversation>(
+  convs: readonly T[],
+  mode: SortMode,
+): T[] {
+  if (mode === "activity") return sortConversationsByBucket(convs);
+  if (mode === "created") {
+    return [...convs].sort((a, b) => {
+      if (a.conversation_id === b.conversation_id) return 0;
+      return a.conversation_id < b.conversation_id ? 1 : -1;
+    });
+  }
+  // name
+  return [...convs].sort((a, b) => {
+    const an = (a.slug || a.conversation_id).toLowerCase();
+    const bn = (b.slug || b.conversation_id).toLowerCase();
+    if (an < bn) return -1;
+    if (an > bn) return 1;
+    return 0;
+  });
+}
+
 // Highest bucket value among the given conversations, used to order groups.
 export function maxBucket(convs: readonly ConversationWithState[]): number {
   let best = -Infinity;

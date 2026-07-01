@@ -3,6 +3,7 @@ import {
   applyStableKeyOrder,
   applyStableOrder,
   neighborAfterRemoval,
+  sortConversations,
   sortConversationsByBucket,
   updatedBucket,
 } from "./conversationSort";
@@ -133,6 +134,42 @@ run("neighborAfterRemoval picks the item below, else above", () => {
   assert(neighborAfterRemoval([a], "A") === null, "only item -> null");
   // Not present -> null.
   assert(neighborAfterRemoval(order, "Z") === null, "absent -> null");
+});
+
+run("sortConversations activity matches sortConversationsByBucket", () => {
+  const a = conv("01HZZZZZZZZZZZZZZZZZZZZZZA", "2026-05-10T12:00:00Z");
+  const b = conv("01HZZZZZZZZZZZZZZZZZZZZZZB", "2026-05-10T12:10:00Z");
+  const viaMode = sortConversations([a, b], "activity").map((c) => c.conversation_id);
+  const viaBucket = sortConversationsByBucket([a, b]).map((c) => c.conversation_id);
+  assert(viaMode.join(",") === viaBucket.join(","), `activity mismatch: ${viaMode}`);
+});
+
+run("sortConversations created orders newest ULID first", () => {
+  // Older activity but newer ULID should still come first in created mode.
+  const older = conv("01HZZZZZZZZZZZZZZZZZZZZZZA", "2026-05-10T12:59:00Z");
+  const newer = conv("01HZZZZZZZZZZZZZZZZZZZZZZB", "2026-05-10T12:00:00Z");
+  const order = sortConversations([older, newer], "created").map((c) => c.conversation_id);
+  assert(order[0].endsWith("B") && order[1].endsWith("A"), `created order: ${order}`);
+});
+
+run("sortConversations name is case-insensitive ascending with slug fallback", () => {
+  const bravo = { ...conv("01A", "2026-05-10T12:00:00Z"), slug: "Bravo" };
+  const alpha = { ...conv("01B", "2026-05-10T12:00:00Z"), slug: "alpha" };
+  const noSlug = { ...conv("00Z", "2026-05-10T12:00:00Z"), slug: null };
+  const order = sortConversations([bravo, alpha, noSlug], "name").map((c) => c.conversation_id);
+  // "00Z" (fallback to id) < "alpha" < "Bravo" (case-insensitive)
+  assert(order.join(",") === "00Z,01B,01A", `name order: ${order}`);
+});
+
+run("sortConversations does not mutate input", () => {
+  const input = [
+    conv("01HZZZZZZZZZZZZZZZZZZZZZZA", "2026-05-10T12:00:00Z"),
+    conv("01HZZZZZZZZZZZZZZZZZZZZZZB", "2026-05-10T12:10:00Z"),
+  ];
+  const before = input.map((c) => c.conversation_id).join(",");
+  sortConversations(input, "created");
+  sortConversations(input, "name");
+  assert(input.map((c) => c.conversation_id).join(",") === before, "input mutated");
 });
 
 console.log("\nconversationSort tests passed");

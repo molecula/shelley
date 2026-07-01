@@ -108,6 +108,10 @@ export interface TranslationKeys {
   directory: string;
   gitRepo: string;
   other: string;
+  sortConversations: string;
+  sortByActivity: string;
+  sortByCreated: string;
+  sortByName: string;
   collapseSubagents: string;
   expandSubagents: string;
   collapseSidebar: string;

@@ -148,6 +148,43 @@
           {{ faviconEnabled ? t("on") : t("off") }}
         </button>
       </div>
+
+      <!-- Web Push -->
+      <div v-if="webPushState !== 'unsupported'" class="model-card notifications-card">
+        <div>
+          <div class="notifications-card-title">Web Push</div>
+          <div class="notifications-card-description">
+            {{
+              webPushState === "denied"
+                ? "Notifications blocked by browser — check your browser settings"
+                : webPushState === "subscribed"
+                  ? "Push notifications active for this device (works when app is closed)"
+                  : "Receive push notifications even when the app is in the background or closed"
+            }}
+          </div>
+        </div>
+        <div class="notifications-card-actions">
+          <button
+            v-if="webPushState === 'subscribed'"
+            class="btn btn-primary btn-sm"
+            :disabled="webPushBusy"
+            @click="toggleWebPush(false)"
+          >
+            {{ webPushBusy ? "..." : "Disable" }}
+          </button>
+          <span v-else-if="webPushState === 'denied'" class="notifications-denied-text">
+            {{ t("denied") }}
+          </span>
+          <button
+            v-else
+            class="btn btn-secondary btn-sm"
+            :disabled="webPushBusy"
+            @click="toggleWebPush(true)"
+          >
+            {{ webPushBusy ? "..." : "Enable" }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Backend channels section -->
@@ -215,6 +252,10 @@ import {
   requestBrowserNotificationPermission,
   isChannelEnabled,
   setChannelEnabled,
+  getWebPushState,
+  subscribeToWebPush,
+  unsubscribeFromWebPush,
+  type WebPushState,
 } from "../../services/notifications";
 
 interface FormData {
@@ -245,6 +286,8 @@ const error = ref<string | null>(null);
 const browserEnabled = ref(isChannelEnabled("browser"));
 const faviconEnabled = ref(isChannelEnabled("favicon"));
 const browserPermission = ref(getBrowserNotificationState());
+const webPushState = ref<WebPushState>("unsubscribed");
+const webPushBusy = ref(false);
 
 const exeNotifyAvailable = window.__SHELLEY_INIT__?.exe_notify_available ?? false;
 const exeNotifyEnabled = ref(true);
@@ -437,6 +480,20 @@ function toggleFavicon() {
   faviconEnabled.value = newVal;
 }
 
+async function toggleWebPush(enable: boolean) {
+  webPushBusy.value = true;
+  try {
+    if (enable) {
+      await subscribeToWebPush();
+    } else {
+      await unsubscribeFromWebPush();
+    }
+    webPushState.value = await getWebPushState();
+  } finally {
+    webPushBusy.value = false;
+  }
+}
+
 watch(
   () => props.isOpen,
   (open) => {
@@ -445,6 +502,7 @@ watch(
       browserPermission.value = getBrowserNotificationState();
       browserEnabled.value = isChannelEnabled("browser");
       faviconEnabled.value = isChannelEnabled("favicon");
+      void getWebPushState().then((s) => (webPushState.value = s));
       if (exeNotifyAvailable) {
         api
           .getSettings()

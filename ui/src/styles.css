@@ -685,6 +685,15 @@ button {
   background: var(--border);
 }
 
+.group-by-menu-section-label {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
 @keyframes conversationItemEnter {
   from {
     opacity: 0;
