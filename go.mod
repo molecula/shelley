@@ -17,6 +17,7 @@ require (
 	github.com/richardlehane/crock32 v1.0.1
 	github.com/samber/slog-http v1.8.2
 	github.com/sashabaranov/go-openai v1.41.1
+	github.com/slack-go/slack v0.19.0
 	go.skia.org/infra v0.0.0-20250421160028-59e18403fd4a
 	golang.org/x/crypto v0.48.0
 	golang.org/x/image v0.34.0
@@ -42,6 +43,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

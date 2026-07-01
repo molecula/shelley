@@ -338,6 +338,8 @@ type Server struct {
 	listenPort int           // TCP port the server is listening on
 	terminals  *TerminalSessions
 
+	onAgentDone func(conversationID string) // optional callback when agent finishes a turn
+
 	// Banner, when non-empty, is shown in a full-width bar at the top of
 	// the UI. Useful for marking demo instances so they're not confused
 	// with the primary Shelley. Set by `serve --banner`.
@@ -425,6 +427,17 @@ func (s *Server) SetModelRefresher(refresh func(context.Context) ([]models.Built
 func (s *Server) RegisterNotificationChannel(ch notifications.Channel) {
 	s.notifDispatcher.Register(ch)
 	s.logger.Info("registered notification channel", "channel", ch.Name())
+}
+
+// SetOnAgentDone registers a callback that fires when any conversation's agent
+// finishes a turn.
+func (s *Server) SetOnAgentDone(fn func(conversationID string)) {
+	s.onAgentDone = fn
+}
+
+// SetSlackAPI enables the Slack tool for all conversations.
+func (s *Server) SetSlackAPI(api claudetool.SlackAPI) {
+	s.toolSetConfig.SlackAPI = api
 }
 
 // RegisterRoutes registers HTTP routes on the given mux
@@ -1573,6 +1586,10 @@ func (s *Server) publishConversationState(state ConversationState) {
 		}
 		// Still set notifEvent so the SSE stream broadcasts it to the UI.
 		notifEvent = &event
+
+		if s.onAgentDone != nil {
+			go s.onAgentDone(state.ConversationID)
+		}
 	}
 
 	s.mu.Lock()

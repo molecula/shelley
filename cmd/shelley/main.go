@@ -22,6 +22,7 @@ import (
 	"shelley.exe.dev/server"
 	_ "shelley.exe.dev/server/notifications/channels" // register channel types
 	"shelley.exe.dev/skills"
+	shellslack "shelley.exe.dev/slack"
 	"shelley.exe.dev/templates"
 	"shelley.exe.dev/version"
 )
@@ -206,6 +207,30 @@ func runServe(global GlobalConfig, args []string) {
 
 	// Generate host icon in background (uses LLM, non-blocking).
 	go svr.EnsureHostIcon()
+
+	// Start Slack bot if configured
+	if llmConfig.SlackBotToken != "" && llmConfig.SlackAppToken != "" {
+		slackAPI := server.NewSlackConversationAPI(svr)
+		bot, err := shellslack.NewBot(shellslack.Config{
+			BotToken: llmConfig.SlackBotToken,
+			AppToken: llmConfig.SlackAppToken,
+			Model:    llmConfig.DefaultModel,
+			Convo:    slackAPI,
+			Logger:   logger,
+		})
+		if err != nil {
+			logger.Error("Failed to create Slack bot", "error", err)
+			os.Exit(1)
+		}
+		svr.SetOnAgentDone(bot.OnAgentDone)
+		svr.SetSlackAPI(bot)
+		go func() {
+			if err := bot.Run(context.Background()); err != nil {
+				logger.Error("Slack bot stopped", "error", err)
+			}
+		}()
+		logger.Info("Slack bot started")
+	}
 
 	// Resolve socket path: "none" disables the Unix socket listener
 	effectiveSocket := *socketPath
@@ -409,7 +434,7 @@ func buildLLMConfig(global GlobalConfig, logger *slog.Logger, database *db.DB) *
 	defaultModel, sources := buildLLMModelSources(context.Background(), global, logger)
 
 	httpc := llmhttp.NewClient(nil)
-	return &server.LLMConfig{
+	cfg := &server.LLMConfig{
 		Models:       modelsources.Build(models.All(), sources, httpc, logger),
 		DefaultModel: defaultModel,
 		DB:           database,
@@ -420,6 +445,32 @@ func buildLLMConfig(global GlobalConfig, logger *slog.Logger, database *db.DB) *
 		},
 		Logger: logger,
 	}
+
+	// Slack tokens: read from config file, with env vars taking precedence.
+	if global.ConfigPath != "" {
+		if data, err := os.ReadFile(global.ConfigPath); err == nil {
+			var slackCfg struct {
+				SlackBotToken string `json:"slack_bot_token"`
+				SlackAppToken string `json:"slack_app_token"`
+			}
+			if err := json.Unmarshal(data, &slackCfg); err == nil {
+				if slackCfg.SlackBotToken != "" {
+					cfg.SlackBotToken = slackCfg.SlackBotToken
+				}
+				if slackCfg.SlackAppToken != "" {
+					cfg.SlackAppToken = slackCfg.SlackAppToken
+				}
+			}
+		}
+	}
+	if v := os.Getenv("SLACK_BOT_TOKEN"); v != "" {
+		cfg.SlackBotToken = v
+	}
+	if v := os.Getenv("SLACK_APP_TOKEN"); v != "" {
+		cfg.SlackAppToken = v
+	}
+
+	return cfg
 }
 
 func buildLLMModelSources(ctx context.Context, global GlobalConfig, logger *slog.Logger) (string, []modelsources.Source) {

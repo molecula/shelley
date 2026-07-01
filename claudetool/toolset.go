@@ -88,6 +88,8 @@ type ToolSetConfig struct {
 	// snapshot taken at server start. If nil, the list is built from
 	// LLMProvider.GetAvailableModels() (without display names).
 	BuildAvailableModels func() []AvailableModel
+	// SlackAPI, if set, enables the "slack" tool for interacting with Slack.
+	SlackAPI SlackAPI
 	// ToolOverrides maps tool name to "on" or "off". Tools not listed use their default.
 	ToolOverrides map[string]string
 	// DisableAllTools disables every tool by default; ToolOverrides with "on" re-enable.
@@ -390,6 +392,11 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 			AvailableModels: availableModels,
 		}
 		tools = append(tools, llmOneShotTool.Tool())
+	}
+
+	if cfg.SlackAPI != nil {
+		slackTool := &SlackTool{API: cfg.SlackAPI}
+		tools = append(tools, slackTool.Tool())
 	}
 
 	var cleanup func()

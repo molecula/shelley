@@ -38,4 +38,8 @@ type LLMConfig struct {
 	RefreshBuiltModels func(context.Context) ([]models.Built, error)
 
 	Logger *slog.Logger
+
+	// Slack integration tokens (optional)
+	SlackBotToken string
+	SlackAppToken string
 }
