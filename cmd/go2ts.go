@@ -140,6 +140,7 @@ type streamResponseForTS struct {
 	Heartbeat         bool                    `json:"heartbeat,omitempty"`
 	NotificationEvent *notificationEventForTS `json:"notification_event,omitempty"`
 	MaxSequenceID     int64                   `json:"max_sequence_id,omitempty"`
+	SessionCostUSD    float64                 `json:"session_cost_usd,omitempty"`
 }
 
 type notificationEventForTS struct {

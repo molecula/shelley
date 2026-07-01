@@ -1064,6 +1064,7 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request, c
 		Conversation: &conversation,
 		// ConversationState is sent via the streaming endpoint, not on initial load
 		ContextWindowSize: calculateContextWindowSize(apiMessages),
+		SessionCostUSD:    calculateSessionCost(apiMessages, db.ParseConversationOptions(conversation.ConversationOptions).BaseCostUSD),
 		MaxSequenceID:     maxSeq,
 	})
 }
@@ -1988,8 +1989,10 @@ func (s *Server) runStream(w http.ResponseWriter, r *http.Request, conversationI
 		// On resume we only have the missed messages, so the calculation would be wrong.
 		// The client keeps its previous value and gets updates from subsequent stream events.
 		var ctxSize uint64
+		var sessionCost float64
 		if !resuming {
 			ctxSize = calculateContextWindowSize(apiMessages)
+			sessionCost = calculateSessionCost(apiMessages, db.ParseConversationOptions(conversation.ConversationOptions).BaseCostUSD)
 		}
 		streamData := StreamResponse{
 			ConversationID: conversationID,
@@ -2001,6 +2004,7 @@ func (s *Server) runStream(w http.ResponseWriter, r *http.Request, conversationI
 				Model:          manager.GetModel(),
 			},
 			ContextWindowSize: ctxSize,
+			SessionCostUSD:    sessionCost,
 		}
 		if !writeStreamData(streamData) {
 			return

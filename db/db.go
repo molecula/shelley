@@ -260,6 +260,10 @@ type ConversationOptions struct {
 	// One of "off", "minimal", "low", "medium", "high", "xhigh". Empty string
 	// means "use the service default". See llm.ParseThinkingLevel.
 	ThinkingLevel string `json:"thinking_level,omitempty"`
+	// BaseCostUSD is a seed cost (USD) carried over from a distilled source
+	// conversation so a distilled/replaced conversation keeps iterating on the
+	// prior running spend. Added to the sum of per-message costs.
+	BaseCostUSD float64 `json:"base_cost_usd,omitempty"`
 }
 
 // IsOrchestrator returns true if the conversation is in orchestrator mode.

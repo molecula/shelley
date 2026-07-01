@@ -99,6 +99,9 @@ type StreamResponse struct {
 	Conversation      *generated.Conversation `json:"conversation,omitempty"`
 	ConversationState *ConversationState      `json:"conversation_state,omitempty"`
 	ContextWindowSize uint64                  `json:"context_window_size,omitempty"`
+	// SessionCostUSD is the total USD spent in this conversation (base carried
+	// over from a distilled source, plus the cost of every message).
+	SessionCostUSD float64 `json:"session_cost_usd,omitempty"`
 	// ConversationListUpdate is set when another conversation in the list changed
 	ConversationListUpdate *ConversationListUpdate `json:"conversation_list_update,omitempty"`
 	// ConversationListPatch is set when requested conversation-list JSON Patch diffs are available.
@@ -264,6 +267,29 @@ func calculateContextWindowSize(messages []APIMessage) uint64 {
 		return ctxUsed
 	}
 	return 0
+}
+
+// sumMessageCosts returns the total cost_usd across all messages' usage data.
+// Messages without usage data (user/tool messages) contribute 0.
+func sumMessageCosts(messages []APIMessage) float64 {
+	var total float64
+	for _, msg := range messages {
+		if msg.UsageData == nil {
+			continue
+		}
+		var usage llm.Usage
+		if err := json.Unmarshal([]byte(*msg.UsageData), &usage); err != nil {
+			continue
+		}
+		total += usage.CostUSD
+	}
+	return total
+}
+
+// calculateSessionCost returns the total USD spent in a conversation: a base
+// cost carried over from a distilled source plus the cost of every message.
+func calculateSessionCost(messages []APIMessage, baseCost float64) float64 {
+	return baseCost + sumMessageCosts(messages)
 }
 
 // isAgentEndOfTurn checks if a message is an agent or error message with end_of_turn=true.
