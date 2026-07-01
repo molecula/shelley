@@ -93,15 +93,28 @@ Upstream also **still uses the `patch` tool** (we replaced it with `edit`/hashli
     `~/.local/bin`, failure hook, staleness scope. Reconcile with upstream Makefile.
 15. **CI** (90a1a716) — build/self-update from molecula fork; version metadata. Fork-specific.
 
-### B. UI-only — must be RE-IMPLEMENTED in Vue
-16. Ctrl+C stop-agent shortcut (9f91b9dd)
-17. Cmd+Shift+D directory picker shortcut (4be1ec3d)
-18. Copy-button feedback + clipboard fallback (eb1d6df4)
-19. Conversation sort options: activity/created/name (fb260b03)
-20. Theme picker modal + diff viewer (monaco-themes) (310b27dc + fixes 2a8c37c0,27ef1aa7,
-    e125043c, 28e90126, mobile/e2e fixes)
-21. Nested subagents in sidebar (UI half of 7a50e9f7)
-22. Edit-tool inline diff rendering (680b318d) — tied to #4.
+### B. UI-only — RE-IMPLEMENTED in Vue  (build-verified via `node scripts/build.js`)
+Key finding: upstream's Vue rewrite ALREADY had several of these; only genuine gaps were built.
+16. Ctrl+C stop-agent shortcut — ✅ DONE (ChatInterface.vue keydown; guards text selection).
+17. Cmd+Shift+D directory picker shortcut — ✅ DONE (same handler).
+18. Copy-button feedback + clipboard fallback — ✅ DONE (Message.vue now uses shared copyText
+    execCommand fallback; feedback already existed upstream).
+19. Conversation sort options: activity/created/name — ✅ DONE (sort selector in drawer,
+    persisted; SortMode in conversationSort.ts; i18n keys added).
+20. Theme picker modal + diff viewer — ✅ ALREADY UPSTREAM (ChatOverflowMenu SelectButton
+    system/light/dark; DiffViewer.vue Monaco). No work needed.
+21. Nested subagents in sidebar — ✅ ALREADY UPSTREAM (ConversationDrawerRow subagentsByParent).
+22. Edit-tool inline diff rendering — ✅ DONE (routed `edit`→PatchTool in MessageContentBlock;
+    edit emits same PatchDisplayData shape).
+
+### B2. UI halves of Group-A backend ports (also Vue)
+- #7 Host icon — ✅ DONE (HostIcon.vue fetches /api/host-icon, mounted in header).
+  (Seashell app-icon PNG/SVG asset swap NOT done — pure branding, optional follow-up.)
+- #6 Web push — ✅ DONE (sw.ts service worker + build.js emit; subscribe flow + toggle in
+  NotificationsModal).
+- #13 Session cost — ✅ DONE (session_cost_usd threaded through messageStore, shown by context bar).
+- #5 PR badges — ✅ DONE (badge per conversation row from pr_info).
+- #8 Slash palette + Library — dynamic /api/commands merge + Conversations|Library (Skills|Commands) tabs.
 
 ### C. Skip / fork-only / trivial
 - ci trigger commits (490df9cc, 8322cc93) — empty/no-op.
