@@ -212,6 +212,21 @@
           {{ convState.git_subject }}
         </span>
       </div>
+
+      <a
+        v-if="prInfo"
+        :href="prInfo.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        :class="`pr-badge ${prStateClass(prInfo)}`"
+        :title="`#${prInfo.number}: ${prInfo.title} (${prStateLabel(prInfo)})`"
+        @click.stop
+      >
+        <svg class="pr-icon" viewBox="0 0 16 16" fill="currentColor" width="12" height="12">
+          <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+        </svg>
+        <span class="pr-number">#{{ prInfo.number }}</span>
+      </a>
     </div>
 
     <div v-if="itemArchived" class="conversation-actions drawer-actions-row-offset">
@@ -304,6 +319,26 @@ const subagentCount = computed(() =>
   isDraft.value ? 0 : conversationSubagents.value.length || convState.value.subagent_count || 0,
 );
 const hasSubagents = computed(() => subagentCount.value > 0);
+
+const prInfo = computed(() => convState.value.pr_info || null);
+function prStateLabel(pr: NonNullable<typeof prInfo.value>): string {
+  if (pr.state === "MERGED") return "merged";
+  if (pr.state === "CLOSED") return "closed";
+  if (pr.is_draft) return "draft";
+  if (pr.in_merge_queue) return "merge queue";
+  if (pr.review_decision === "APPROVED") return "approved";
+  if (pr.review_decision === "CHANGES_REQUESTED") return "changes requested";
+  return "open";
+}
+function prStateClass(pr: NonNullable<typeof prInfo.value>): string {
+  if (pr.state === "MERGED") return "pr-merged";
+  if (pr.state === "CLOSED") return "pr-closed";
+  if (pr.is_draft) return "pr-draft";
+  if (pr.in_merge_queue) return "pr-queued";
+  if (pr.review_decision === "APPROVED") return "pr-approved";
+  if (pr.review_decision === "CHANGES_REQUESTED") return "pr-changes";
+  return "pr-open";
+}
 const isExpanded = computed(() =>
   ctx.expandedSubagents.value.has(props.conversation.conversation_id),
 );
