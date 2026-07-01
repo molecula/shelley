@@ -34,6 +34,17 @@ export interface Usage {
 	end_time?: string | null;
 }
 
+export interface PRInfo {
+	number: number;
+	title: string;
+	state: string;
+	url: string;
+	is_draft: boolean;
+	auto_merge: boolean;
+	review_decision: string;
+	in_merge_queue: boolean;
+}
+
 export interface ApiMessageForTS {
 	message_id: string;
 	conversation_id: string;
@@ -98,6 +109,7 @@ export interface ConversationWithStateForTS {
 	git_commit?: string;
 	git_subject?: string;
 	subagent_count: number;
+	pr_info?: PRInfo | null;
 	preview?: string;
 	preview_updated_at?: string;
 	search_snippet?: string;

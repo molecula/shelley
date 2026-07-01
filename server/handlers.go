@@ -930,6 +930,9 @@ func (s *Server) decorateConversations(ctx context.Context, conversations []db.C
 				cws.GitWorktreeRoot = entry.worktree
 				cws.GitCommit = entry.state.Commit
 				cws.GitSubject = entry.state.Subject
+				if entry.state.Branch != "" {
+					cws.PRInfo = gitstate.GetPRCache().GetPRInfo(entry.state.Worktree, entry.state.Branch)
+				}
 			}
 		}
 		result[i] = cws

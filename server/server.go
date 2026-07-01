@@ -25,6 +25,7 @@ import (
 	"shelley.exe.dev/claudetool"
 	"shelley.exe.dev/db"
 	"shelley.exe.dev/db/generated"
+	"shelley.exe.dev/gitstate"
 	"shelley.exe.dev/llm"
 	"shelley.exe.dev/models"
 	"shelley.exe.dev/server/notifications"
@@ -69,14 +70,18 @@ type ConversationState struct {
 // fetch. PreviewUpdatedAt is the agent message's CreatedAt (RFC 3339).
 type ConversationWithState struct {
 	generated.Conversation
-	Working          bool   `json:"working"`
-	GitRepoRoot      string `json:"git_repo_root,omitempty"`
-	GitWorktreeRoot  string `json:"git_worktree_root,omitempty"`
-	GitCommit        string `json:"git_commit,omitempty"`
-	GitSubject       string `json:"git_subject,omitempty"`
-	SubagentCount    int64  `json:"subagent_count"`
-	Preview          string `json:"preview,omitempty"`
-	PreviewUpdatedAt string `json:"preview_updated_at,omitempty"`
+	Working         bool   `json:"working"`
+	GitRepoRoot     string `json:"git_repo_root,omitempty"`
+	GitWorktreeRoot string `json:"git_worktree_root,omitempty"`
+	GitCommit       string `json:"git_commit,omitempty"`
+	GitSubject      string `json:"git_subject,omitempty"`
+	SubagentCount   int64  `json:"subagent_count"`
+	// PRInfo is the GitHub pull request status for the conversation's branch,
+	// populated from the PR cache (never blocks on a network call). Nil when
+	// the branch has no PR or the cache is cold.
+	PRInfo           *gitstate.PRInfo `json:"pr_info,omitempty"`
+	Preview          string           `json:"preview,omitempty"`
+	PreviewUpdatedAt string           `json:"preview_updated_at,omitempty"`
 	// MaxSequenceID is the highest message sequence_id stored for this
 	// conversation. Clients use it to decide whether their cached snapshot
 	// is up to date without a separate /api/conversation/<id> roundtrip.
@@ -1473,6 +1478,65 @@ func (s *Server) notifyConversationListChanged() {
 	}
 }
 
+// prRefreshRoutine periodically refreshes GitHub PR status for every
+// conversation's branch and republishes the conversation list so badges
+// update. Runs an immediate refresh on startup, then every 60 seconds.
+func (s *Server) prRefreshRoutine() {
+	s.refreshAllPRs()
+
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.refreshAllPRs()
+	}
+}
+
+// refreshAllPRs collects the (worktree, branch) pairs for all conversations,
+// batch-refreshes the PR cache via gh, and triggers a conversation-list
+// recompute so updated PR info is broadcast. Never blocks longer than the gh
+// calls take; transient gh failures leave existing cache entries intact.
+func (s *Server) refreshAllPRs() {
+	ctx := context.Background()
+	conversations, err := s.db.ListConversations(ctx, 200, 0)
+	if err != nil {
+		s.logger.Error("PR refresh: failed to list conversations", "error", err)
+		return
+	}
+
+	// Build worktree -> set of branches, deduped across conversations.
+	repoBranches := make(map[string]map[string]bool)
+	for _, item := range conversations {
+		conv := item.Conversation
+		if conv.Cwd == nil {
+			continue
+		}
+		gs := gitstate.GetGitState(*conv.Cwd)
+		if !gs.IsRepo || gs.Branch == "" {
+			continue
+		}
+		if repoBranches[gs.Worktree] == nil {
+			repoBranches[gs.Worktree] = make(map[string]bool)
+		}
+		repoBranches[gs.Worktree][gs.Branch] = true
+	}
+
+	if len(repoBranches) == 0 {
+		return
+	}
+
+	prCache := gitstate.GetPRCache()
+	prCache.InvalidateAll()
+	done := make(chan struct{})
+	prCache.RefreshRepos(repoBranches, func() { close(done) })
+	<-done
+
+	// Recompute and broadcast the conversation list so the fresh PR info
+	// (read inside decorateConversations) reaches subscribers.
+	if err := s.conversationListStream.notify(ctx); err != nil {
+		s.logger.Error("PR refresh: failed to publish conversation list", "error", err)
+	}
+}
+
 func (s *Server) publishConversationListUpdate(update ConversationListUpdate) {
 	// Populate git info from conversation cwd
 	if update.Conversation != nil && update.Conversation.Cwd != nil {
@@ -1771,6 +1835,9 @@ func (s *Server) StartWithListeners(tcpListener net.Listener, socketPath string)
 
 	// Start auto-upgrade routine
 	go s.autoUpgradeRoutine()
+
+	// Start PR status refresh routine
+	go s.prRefreshRoutine()
 
 	// Get actual port from listener
 	actualPort := tcpListener.Addr().(*net.TCPAddr).Port
