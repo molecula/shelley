@@ -8,10 +8,12 @@ Ported onto `rebase-onto-upstream` (see `git log 4013a5d..HEAD`). Backend/toolin
 UI halves of #1/#5/#6/#7/#8/#13 + all of Group B tracked below.
 
 Key reconciliation decisions (differ from a literal molecula replay):
-- **#4 edit/patch — COEXIST, not replace.** Added hashline `edit`+`read` tools ALONGSIDE
-  upstream's `patch` (which is mature: weak-model schema, UI rendering, predictable.go).
-  Reused patch's `PatchDisplayData` shape so edit results render in the existing UI.
-  "Remove patch" left as a deliberate cross-cutting follow-up.
+- **#4 edit — patch REMOVED, consolidated on hashline `edit`+`read`.** Initially added
+  alongside patch, then removed patch entirely (patch.go/patchkit/editbuf deleted; dropped
+  from tool set + registry; predictable fixtures + distill file-tracking retargeted to edit;
+  UI keeps a `patch` renderer case for historical messages). Dormant leftovers: the
+  `llm.SimplifiedPatcher` infra + `isStrongModel` (only served patch's weak-model schema) —
+  left in place, isolated/harmless, removal deferred as pure tidiness.
 - **#13 cost — gateway header PRIMARY, local pricing FALLBACK.** Molecula removed the
   `Exedev-Gateway-Cost` header; we kept it and fall back to local `ModelPrice` tables only
   when it's 0, so cost is right with the gateway AND non-zero with a direct provider key.
