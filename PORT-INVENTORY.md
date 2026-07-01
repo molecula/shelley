@@ -3,6 +3,34 @@
 Base: `bold/main` @ b31c35e. Our fork: `molecula` (backup branch `molecula-backup`).
 Merge-base: `4688882`. 62 molecula commits, 325 upstream commits since.
 
+## PROGRESS — Group A (Go backend) COMPLETE ✅ (15/15)
+Ported onto `rebase-onto-upstream` (see `git log 4013a5d..HEAD`). Backend/tooling done;
+UI halves of #1/#5/#6/#7/#8/#13 + all of Group B tracked below.
+
+Key reconciliation decisions (differ from a literal molecula replay):
+- **#4 edit/patch — COEXIST, not replace.** Added hashline `edit`+`read` tools ALONGSIDE
+  upstream's `patch` (which is mature: weak-model schema, UI rendering, predictable.go).
+  Reused patch's `PatchDisplayData` shape so edit results render in the existing UI.
+  "Remove patch" left as a deliberate cross-cutting follow-up.
+- **#13 cost — gateway header PRIMARY, local pricing FALLBACK.** Molecula removed the
+  `Exedev-Gateway-Cost` header; we kept it and fall back to local `ModelPrice` tables only
+  when it's 0, so cost is right with the gateway AND non-zero with a direct provider key.
+- **#5 PR badges** delivered via `PRInfo` on the conversation-list patch stream (upstream's
+  architecture), not molecula's separate broadcast/endpoint.
+- **#9 skills** — ported only repo-local `.claude/skills/` discovery + `new-conversation`
+  builtin. SKIPPED molecula's `skills.go` tree-discovery/always-on refactor + caveman removal:
+  upstream's skills system diverged (own builtin set + ListAll/DiscoverInTree) and the
+  refactor would regress it. Needs separate reconciliation if still wanted.
+- **#14** — moved UI-staleness check out of `ui.init()` into `ui.EnforceFreshBuild()` (called
+  only from `serve`); this also unblocked all Go tests that transitively import `ui`.
+- **#15 CI** — pointed release/self-update at `molecula/shelley`, dropped homebrew tap, but
+  KEPT workflow branch triggers on `main` (this rebased branch becomes the fork's main),
+  unlike molecula's dedicated `molecula` branch.
+
+Pre-existing env-only test failures (NOT regressions, exist on bold/main): TestWithAnthropicAPI
+(needs API key), TestSystemdListenerIntegration (needs built UI), TestBrowserDownload (needs
+headless browser). All ported packages' unit tests pass.
+
 ## KEY UPSTREAM CHANGE
 Upstream **deleted the React frontend and rewrote the UI in Vue 3 + PrimeVue**.
 Every React (.tsx) commit of ours must be **re-implemented in Vue**, not merged.
