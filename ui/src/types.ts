@@ -116,6 +116,7 @@ export interface StreamDelta {
 export interface StreamResponse extends Omit<StreamResponseForTS, "messages"> {
   messages?: Message[];
   context_window_size?: number;
+  session_cost_usd?: number;
   conversation_list_patch?: ConversationListPatchEvent;
   heartbeat?: boolean;
   notification_event?: NotificationEvent;

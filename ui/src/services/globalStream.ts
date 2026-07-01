@@ -207,6 +207,9 @@ export function connectGlobalStream({
     if (typeof data.context_window_size === "number") {
       messageStore.setContextWindowSize(convId, data.context_window_size);
     }
+    if (typeof data.session_cost_usd === "number") {
+      messageStore.setSessionCost(convId, data.session_cost_usd);
+    }
     // NB: we deliberately do NOT mirror data.conversation_state.working
     // into messageStore here. The conversation_list_patch stream is the
     // single authoritative source of truth for agent_working:

@@ -63,6 +63,14 @@
     >
       {{ tildifyPath(currentConversation?.cwd || selectedCwd) }}
     </span>
+    <span
+      v-if="sessionCostUsd > 0"
+      class="session-cost"
+      title="Total spent this session (USD)"
+      data-testid="session-cost"
+    >
+      {{ formatSessionCost(sessionCostUsd) }}
+    </span>
     <ContextUsageBar
       :context-window-size="contextWindowSize"
       :max-context-tokens="maxContextTokens"
@@ -214,6 +222,14 @@
     >
       {{ tildifyPath(currentConversation?.cwd || selectedCwd) }}
     </span>
+    <span
+      v-if="sessionCostUsd > 0"
+      class="session-cost"
+      title="Total spent this session (USD)"
+      data-testid="session-cost"
+    >
+      {{ formatSessionCost(sessionCostUsd) }}
+    </span>
     <ContextUsageBar
       :context-window-size="contextWindowSize"
       :max-context-tokens="maxContextTokens"
@@ -255,6 +271,7 @@ const props = defineProps<{
   cancelling: boolean;
   selectedCwd: string;
   contextWindowSize: number;
+  sessionCostUsd: number;
   maxContextTokens: number;
   selectedModelDisplayName: string;
   hostname: string;
@@ -300,6 +317,13 @@ watch(showAdvancedSettings, (open) => {
   if (open) document.addEventListener("mousedown", onOutside);
 });
 onUnmounted(() => document.removeEventListener("mousedown", onOutside));
+
+// Format a cumulative USD spend for the toolbar. Small values get more
+// precision so a fraction of a cent isn't rounded to "$0.00".
+function formatSessionCost(cost: number): string {
+  if (cost > 0 && cost < 0.01) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+}
 
 function currentOverride(name: string): "default" | "on" | "off" {
   return props.toolOverrides[name] || "default";

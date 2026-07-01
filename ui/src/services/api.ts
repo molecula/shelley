@@ -668,6 +668,17 @@ class ApiService {
     }
     return response.json();
   }
+
+  // getHostIcon fetches the LLM-generated SVG icon for this host from
+  // /api/host-icon. Returns the raw SVG markup, or null when the server
+  // has none yet (404) or the request otherwise fails.
+  async getHostIcon(): Promise<string | null> {
+    const response = await fetch(`${this.baseUrl}/host-icon`);
+    if (!response.ok) {
+      return null;
+    }
+    return response.text();
+  }
 }
 
 export const api = new ApiService();

@@ -105,6 +105,7 @@ interface ConvMetaRow {
 interface ConvMetaPayload {
   conversation: Conversation | null;
   context_window_size: number;
+  session_cost_usd: number;
 }
 
 /** Singleton row in keys_meta. */
@@ -144,7 +145,7 @@ type IDBPObjectStoreForVerify = IDBPObjectStore<
 >;
 
 function emptyPayload(): ConvMetaPayload {
-  return { conversation: null, context_window_size: 0 };
+  return { conversation: null, context_window_size: 0, session_cost_usd: 0 };
 }
 
 // ─── Public in-memory aggregate shape ────────────────────────────────────────
@@ -155,6 +156,7 @@ export interface ConversationCacheRecord {
   messages: Message[];
   conversation: Conversation | null;
   contextWindowSize: number;
+  sessionCostUsd: number;
   minSequenceId: number;
   maxSequenceId: number;
   /** Server-reported max sequence_id (from stream events or conversation list). */
@@ -181,6 +183,7 @@ function emptyRecord(id: string): ConversationCacheRecord {
     messages: [],
     conversation: null,
     contextWindowSize: 0,
+    sessionCostUsd: 0,
     minSequenceId: 0,
     maxSequenceId: -1,
     maxSequenceIdKnown: 0,
@@ -529,6 +532,7 @@ export class MessageStore {
             messages: decrypted,
             conversation: payload.conversation,
             contextWindowSize: payload.context_window_size,
+            sessionCostUsd: payload.session_cost_usd,
             minSequenceId: minSeq,
             maxSequenceId: maxSeq,
             maxSequenceIdKnown: meta.max_sequence_id_known,
@@ -604,8 +608,9 @@ export class MessageStore {
     const snapshotKnown = rec.maxSequenceIdKnown;
     const snapshotConv = rec.conversation;
     const snapshotCtx = rec.contextWindowSize;
+    const snapshotCost = rec.sessionCostUsd;
     this.track(
-      this._persistUpsert(id, snapshotIncoming, snapshotKnown, snapshotConv, snapshotCtx),
+      this._persistUpsert(id, snapshotIncoming, snapshotKnown, snapshotConv, snapshotCtx, snapshotCost),
     ).catch((err) => console.warn("messageStore.upsertMessages: persist failed:", err));
   }
 
@@ -615,6 +620,7 @@ export class MessageStore {
     knownHint: number,
     convHint: Conversation | null,
     ctxHint: number,
+    costHint: number,
   ): Promise<void> {
     const material = await this.getKey();
     if (!material) return;
@@ -642,6 +648,10 @@ export class MessageStore {
         existingPayload?.context_window_size && existingPayload.context_window_size > 0
           ? existingPayload.context_window_size
           : ctxHint,
+      session_cost_usd:
+        existingPayload?.session_cost_usd && existingPayload.session_cost_usd > 0
+          ? existingPayload.session_cost_usd
+          : costHint,
     };
     const { iv, ct } = await wrapJSON(material.key, payload, this.metaAAD(id));
 
@@ -732,6 +742,7 @@ export class MessageStore {
       messages,
       conversation: response.conversation ?? existing?.conversation ?? null,
       contextWindowSize: response.context_window_size ?? existing?.contextWindowSize ?? 0,
+      sessionCostUsd: response.session_cost_usd ?? existing?.sessionCostUsd ?? 0,
       minSequenceId: minSeq,
       maxSequenceId: maxSeq,
       maxSequenceIdKnown: knownAfter,
@@ -763,6 +774,7 @@ export class MessageStore {
     const payload: ConvMetaPayload = {
       conversation: rec.conversation ?? existingPayload?.conversation ?? null,
       context_window_size: rec.contextWindowSize,
+      session_cost_usd: rec.sessionCostUsd,
     };
     const { iv, ct } = await wrapJSON(material.key, payload, this.metaAAD(id));
 
@@ -822,6 +834,21 @@ export class MessageStore {
     );
   }
 
+  // ── setSessionCost ─────────────────────────────────────────────────────────
+
+  setSessionCost(id: string, cost: number): void {
+    const rec = this.hot.get(id) ?? emptyRecord(id);
+    if (rec.sessionCostUsd === cost) return;
+    rec.sessionCostUsd = cost;
+    rec.updatedAt = Date.now();
+    this.hot.set(id, rec);
+    this.hydrated.add(id);
+    this.notify(id);
+    this.track(this._patchMeta(id, { session_cost_usd: cost })).catch((err) =>
+      console.warn("messageStore.setSessionCost: persist failed:", err),
+    );
+  }
+
   // ── setMaxSequenceIdKnown ──────────────────────────────────────────────────
 
   /**
@@ -855,9 +882,9 @@ export class MessageStore {
    *     setMaxSequenceIdKnown and markAllStale hit — they are the only
    *     paths that fire on every stream event so they must stay atomic.
    *   - Patches touching the encrypted payload (conversation,
-   *     context_window_size): we snapshot+decrypt+re-encrypt outside the
-   *     tx (because crypto.subtle awaits would auto-commit the tx).
-   *     setConversation / setContextWindowSize fire at most once per
+   *     context_window_size, session_cost_usd): we snapshot+decrypt+re-encrypt
+   *     outside the tx (because crypto.subtle awaits would auto-commit the tx).
+   *     setConversation / setContextWindowSize / setSessionCost fire at most once per
    *     server-pushed conversation update, so last-write-wins between
    *     concurrent payload patches is acceptable.
    */
@@ -866,6 +893,7 @@ export class MessageStore {
     patch: {
       conversation?: Conversation | null;
       context_window_size?: number;
+      session_cost_usd?: number;
       max_sequence_id_known?: number;
       max_sequence_id_local?: number;
       has_full_history?: boolean;
@@ -874,7 +902,9 @@ export class MessageStore {
     const material = await this.getKey();
     if (!material) return;
     const touchesPayload =
-      patch.conversation !== undefined || patch.context_window_size !== undefined;
+      patch.conversation !== undefined ||
+      patch.context_window_size !== undefined ||
+      patch.session_cost_usd !== undefined;
     const db = await this.db();
 
     // For payload-touching patches: snapshot the existing payload, merge,
@@ -897,6 +927,10 @@ export class MessageStore {
           patch.context_window_size !== undefined
             ? patch.context_window_size
             : basePayload.context_window_size,
+        session_cost_usd:
+          patch.session_cost_usd !== undefined
+            ? patch.session_cost_usd
+            : basePayload.session_cost_usd,
       };
       payloadCipher = await wrapJSON(material.key, newPayload, this.metaAAD(id));
     }

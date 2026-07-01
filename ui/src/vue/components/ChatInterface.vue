@@ -39,6 +39,8 @@
           </svg>
         </button>
 
+        <HostIcon :hostname="hostname" :size="22" />
+
         <h1 class="header-title" :title="currentConversation?.slug || 'Shelley'">
           {{ displayTitle }}
         </h1>
@@ -404,6 +406,7 @@ import ChatOverflowMenu from "./ChatOverflowMenu.vue";
 import MessageRenderNode from "./MessageRenderNode.vue";
 import QueuedGhostMessage from "./QueuedGhostMessage.vue";
 import ChatStatusContent from "./ChatStatusContent.vue";
+import HostIcon from "./HostIcon.vue";
 import MarkdownContent from "./MarkdownContent.vue";
 
 // Props mirror ChatInterfaceProps in the React source. Callbacks that
@@ -569,6 +572,7 @@ const diffCommentText = ref("");
 const agentWorking = ref(false);
 const cancelling = ref(false);
 const contextWindowSize = ref(0);
+const sessionCostUsd = ref(0);
 const toolProgress = ref<Record<string, ToolProgress>>({});
 const streamingText = ref("");
 const subagentBackend = ref<"shelley" | "claude-cli" | "codex-cli">("shelley");
@@ -1009,6 +1013,7 @@ function syncFromStore(focusedId: string) {
   lastKnownMessageCount.value = rec.messages.length;
   saveMsgCount(rec.messages.length);
   contextWindowSize.value = rec.contextWindowSize;
+  sessionCostUsd.value = rec.sessionCostUsd;
   if (props.onConversationUpdate && rec.conversation) {
     props.onConversationUpdate(rec.conversation);
   }
@@ -1057,6 +1062,7 @@ async function loadMessages(focusedId: string) {
     lastKnownMessageCount.value = cached.messages.length;
     saveMsgCount(cached.messages.length);
     contextWindowSize.value = cached.contextWindowSize;
+    sessionCostUsd.value = cached.sessionCostUsd;
     if (props.onConversationUpdate && cached.conversation) {
       props.onConversationUpdate(cached.conversation);
     }
@@ -1129,6 +1135,7 @@ async function loadMessages(focusedId: string) {
     showLoadingProgressUI.value = false;
     loadingProgress.value = null;
     contextWindowSize.value = response.context_window_size ?? 0;
+    sessionCostUsd.value = response.session_cost_usd ?? 0;
     if (props.onConversationUpdate && response.conversation) {
       props.onConversationUpdate(response.conversation);
     }
@@ -1655,6 +1662,7 @@ const statusContentProps = computed(() => ({
   cancelling: cancelling.value,
   selectedCwd: selectedCwd.value,
   contextWindowSize: contextWindowSize.value,
+  sessionCostUsd: sessionCostUsd.value,
   maxContextTokens: maxContextTokens.value,
   selectedModelDisplayName: selectedModelDisplayName.value,
   hostname,
@@ -1853,6 +1861,7 @@ watch(
     if (!id) {
       messages.value = [];
       contextWindowSize.value = 0;
+      sessionCostUsd.value = 0;
       toolProgress.value = {};
       streamingText.value = "";
       agentWorking.value = false;
