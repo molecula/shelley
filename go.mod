@@ -3,6 +3,7 @@ module shelley.exe.dev
 go 1.26.4
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/boldsoftware/shelley/lazycue v0.0.0-00010101000000-000000000000
 	github.com/chromedp/cdproto v0.0.0-20260328224638-b7b298a31867
 	github.com/chromedp/chromedp v0.15.1
@@ -38,6 +39,7 @@ require (
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
