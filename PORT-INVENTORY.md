@@ -1,0 +1,80 @@
+# Molecula → upstream (bold/main) port inventory
+
+Base: `bold/main` @ b31c35e. Our fork: `molecula` (backup branch `molecula-backup`).
+Merge-base: `4688882`. 62 molecula commits, 325 upstream commits since.
+
+## KEY UPSTREAM CHANGE
+Upstream **deleted the React frontend and rewrote the UI in Vue 3 + PrimeVue**.
+Every React (.tsx) commit of ours must be **re-implemented in Vue**, not merged.
+Upstream also **still uses the `patch` tool** (we replaced it with `edit`/hashline).
+
+## Already in upstream — DO NOT PORT
+- Models: claude-opus-4.7, claude-opus-4.8, gpt-5.5 (and more). (commits 3d5187f5, b1383767, f8dc569a, e193213a)
+- Brevity system-prompt guidance (be4c14c3, c2dcd4dc) — upstream prompt already says "Communicate with brevity".
+- Subagent depth limit backend `MaxSubagentDepth` (backend half of 7a50e9f7).
+- Drag-drop file upload **backend** handler (backend half of 0cd5fcfa).
+- Notifications dispatcher infra (discord/email/ntfy) — ours built on same infra.
+- exe.dev/exe.xyz cleanup (f5b02ca9) — mostly already done upstream; verify no regressions.
+
+---
+
+## FEATURES TO PORT (grouped)
+
+### A. Backend/tooling (Go) — clean adds, low UI coupling
+1. **Slack integration** (0c298b04, 732e4bf3, c6735ad7, 8b107850-slack-part)
+   - New: `slack/` pkg (Socket Mode client), `claudetool/slack.go` tool, `server/slack_api.go`.
+   - Wires: `claudetool.ToolSetConfig.SlackAPI`, `server.SetSlackAPI`, config tokens
+     (`slack_bot_token`/`slack_app_token`) in `cmd/shelley/main.go` + `server/llmconfig.go`.
+   - Tool actions: send_message, get_history, get_thread, list_channels, add_reaction,
+     find_users, lookup_user_by_email.
+2. **MCP client** (30a5b87a)
+   - New: `mcp/` pkg (generic client + HTTP Streamable transport), `claudetool/mcp_tools.go`
+     (deferred tool loading). Wires into `loop/loop.go`, `server/convo.go`, `llmconfig.go`,
+     `cmd/shelley/main.go` (mcp_servers config).
+3. **RTK bash token optimization** (b51d1817)
+   - New: `claudetool/rtk.go`; hook in `claudetool/bash.go`.
+4. **Hashline read/edit tools + remove patch** (49db60cf, c0dc0318, adebd824, 680b318d-UI)
+   - New: `claudetool/read.go`, `claudetool/edit.go`, `claudetool/hashline/`, `claudetool/editbuf/`.
+   - Removes `claudetool/patch.go`/`patchkit`. Updates toolset, prompts, loop/predictable.go,
+     models refs, llm packages. **Big & cross-cutting.** UI must render edit results w/ inline diffs.
+5. **GitHub PR status badges** (cdb15d98, a9a5bc29, 2911e541, eba292da)
+   - New: `gitstate/pr.go`; `server/handlers.go`/`server.go` endpoints; `cmd/go2ts.go` types.
+   - UI: PR badges in conversation list (Vue re-impl).
+6. **Web push notifications (iOS/macOS)** (7e637a13, 1d814e95)
+   - New: `db/push_subscriptions.go`, `db/schema/018-push-subscriptions.sql`,
+     `server/notifications/channels/webpush.go`, `server/push_subscriptions.go`. go.mod dep.
+   - UI: subscribe/permission flow (Vue re-impl).
+7. **Hostname identicon + seashell app icons** (eeb27503)
+   - New: `server/host_icon.go`; wires `cmd/shelley/main.go`, `server.go`. UI: show icon.
+8. **Slash command palette + skills/commands library** (9ca9e8b8, 135e1f0c)
+   - New: `commands/` pkg, `server/commands_handlers.go`. UI: palette (Vue re-impl).
+9. **Skills system changes** (aa6ddf6c, bfc3305a, 56ac18e7, 8f22d361)
+   - Built-in skills, always-on config, remove tree discovery; discover repo-local
+     `.claude/skills/`; add `new-conversation` builtin; remove caveman.
+   - NOTE: reconcile with upstream's own builtin skills set. Careful merge.
+10. **Config default path** (418d36d5) — default `-config` to `$XDG_CONFIG_HOME/shelley/shelley.json`.
+11. **Slug fix** (22ae2706) — skip thinking blocks when models return them.
+12. **Anthropic test fix** (c8a29299) — first text content block. (may be obsolete upstream)
+13. **Session cost / local pricing** (97fbbb51, 9885c5ac) — DESIGN DIVERGENCE, decide first.
+    Upstream computes `CostUSD` from the exe.dev gateway response header
+    (`Exedev-Gateway-Cost`, `llm/llm.go:CostUSDFromResponse`). OURS computes cost
+    **locally** from token counts + per-model pricing tables (`llm/*/pricing.go`),
+    which works without the gateway. Port our local pricing as a fallback when the
+    gateway header is absent. UI: session cost in toolbar (Vue re-impl, 97fbbb51 UI half).
+14. **Deployment** (b374b189, 94cc8365) — systemd unit, launchd plist, `make install` to
+    `~/.local/bin`, failure hook, staleness scope. Reconcile with upstream Makefile.
+15. **CI** (90a1a716) — build/self-update from molecula fork; version metadata. Fork-specific.
+
+### B. UI-only — must be RE-IMPLEMENTED in Vue
+16. Ctrl+C stop-agent shortcut (9f91b9dd)
+17. Cmd+Shift+D directory picker shortcut (4be1ec3d)
+18. Copy-button feedback + clipboard fallback (eb1d6df4)
+19. Conversation sort options: activity/created/name (fb260b03)
+20. Theme picker modal + diff viewer (monaco-themes) (310b27dc + fixes 2a8c37c0,27ef1aa7,
+    e125043c, 28e90126, mobile/e2e fixes)
+21. Nested subagents in sidebar (UI half of 7a50e9f7)
+22. Edit-tool inline diff rendering (680b318d) — tied to #4.
+
+### C. Skip / fork-only / trivial
+- ci trigger commits (490df9cc, 8322cc93) — empty/no-op.
+- Merge commits — N/A.
