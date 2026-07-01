@@ -25,6 +25,7 @@ import (
 	"shelley.exe.dev/skills"
 	shellslack "shelley.exe.dev/slack"
 	"shelley.exe.dev/templates"
+	"shelley.exe.dev/ui"
 	"shelley.exe.dev/version"
 )
 
@@ -177,6 +178,11 @@ func runServe(global GlobalConfig, args []string) {
 	socketPath := fs.String("socket", client.DefaultSocketPath(), "Path to Unix socket for local CLI client access (set to 'none' to disable)")
 	banner := fs.String("banner", "", "If set, shows this text in a banner at the top of the UI (useful for marking demo instances)")
 	fs.Parse(args)
+
+	// Only `serve` actually uses the embedded UI, so the staleness check lives
+	// here (not in ui.init()) so scheduled `client` invocations and tests
+	// don't break when ui/src is edited without rebuilding.
+	ui.EnforceFreshBuild()
 
 	logger := setupLogging(global.Debug)
 

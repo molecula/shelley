@@ -25,14 +25,18 @@ func init() {
 		panic(err)
 	}
 	assets = http.FS(sub)
-
-	// Check if UI sources are stale compared to the embedded build
-	checkStaleness()
 }
 
-// checkStaleness verifies that the embedded UI build is not stale.
-// If ui/src exists and has files modified after the build, we exit with an error.
-func checkStaleness() {
+// EnforceFreshBuild exits the process with status 1 if the embedded UI build
+// is stale relative to ui/src on disk.
+//
+// Call this only from commands that actually serve the UI (i.e. `serve`) —
+// not from CLI subcommands or tests, because that would break scheduled
+// invocations (e.g. `shelley client chat` from a systemd timer) whenever a
+// developer edits ui/src without rebuilding. cmd/shelley imports server +
+// version, both of which transitively import ui, so an init() check would
+// run for every subcommand.
+func EnforceFreshBuild() {
 	// Read build-info.json from embedded filesystem
 	buildInfoData, err := fs.ReadFile(Dist, "dist/build-info.json")
 	if err != nil {

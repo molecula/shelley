@@ -1,6 +1,6 @@
 # Shelley Makefile
 
-.PHONY: build build-linux-aarch64 build-linux-x86 test test-go test-e2e ui serve clean help templates demo
+.PHONY: build build-linux-aarch64 build-linux-x86 install test test-go test-e2e ui serve clean help templates demo
 
 # Default target
 all: build
@@ -16,6 +16,14 @@ templates:
 build: ui templates
 	@echo "Building Shelley..."
 	go build -o bin/shelley ./cmd/shelley
+
+# Install the binary + scheduled-job failure hook to ~/.local
+install: build
+	@mkdir -p $(HOME)/.local/bin $(HOME)/.config/systemd/user
+	mv bin/shelley $(HOME)/.local/bin/shelley
+	install -m 0755 shelley-unit-failure          $(HOME)/.local/bin/shelley-unit-failure
+	install -m 0644 shelley-unit-failure@.service $(HOME)/.config/systemd/user/shelley-unit-failure@.service
+	@echo "Installed shelley + shelley-unit-failure to $(HOME)/.local/bin/"
 
 # Build for Linux (auto-detect architecture)
 build-linux: ui templates
@@ -95,6 +103,7 @@ help:
 	@echo "Shelley Build Commands:"
 	@echo ""
 	@echo "  build         Build UI, templates, and Go binary"
+	@echo "  install       Build and install binary + scheduled-job failure hook"
 	@echo "  build-linux-aarch64  Build for Linux ARM64"
 	@echo "  build-linux-x86      Build for Linux x86_64"
 	@echo "  ui            Build UI only"
