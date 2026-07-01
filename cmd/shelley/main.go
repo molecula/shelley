@@ -204,6 +204,9 @@ func runServe(global GlobalConfig, args []string) {
 	// Load notification channels from DB.
 	svr.ReloadNotificationChannels()
 
+	// Generate host icon in background (uses LLM, non-blocking).
+	go svr.EnsureHostIcon()
+
 	// Resolve socket path: "none" disables the Unix socket listener
 	effectiveSocket := *socketPath
 	if effectiveSocket == "none" {

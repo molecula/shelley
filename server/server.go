@@ -478,6 +478,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// Models API (dynamic list refresh)
 	mux.Handle("POST /api/models/refresh", http.HandlerFunc(s.handleModelRefresh))
 	mux.Handle("/api/models", http.HandlerFunc(s.handleModels))
+	mux.Handle("/api/host-icon", http.HandlerFunc(s.handleHostIcon))
 	mux.Handle("/api/tools", http.HandlerFunc(s.handleTools))
 
 	// Version endpoints
