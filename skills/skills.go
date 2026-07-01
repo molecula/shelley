@@ -390,8 +390,12 @@ func expandPath(path string) string {
 	return path
 }
 
-// ProjectSkillsDirs returns all .skills directories found by walking up from
-// the working directory to the git root (or filesystem root if no git root).
+// ProjectSkillsDirs returns all repo-local skill directories found by walking
+// up from the working directory to the git root (or filesystem root if no git
+// root). At each level it looks for both `.skills/` and `.claude/skills/` (the
+// convention used by Claude Code). Returned dirs are ordered
+// closest-to-working-dir first, so callers can give them precedence over
+// global directories.
 func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 	var dirs []string
 	seen := make(map[string]bool)
@@ -402,11 +406,19 @@ func ProjectSkillsDirs(workingDir, gitRoot string) []string {
 		stopAt = "/"
 	}
 
+	candidates := []string{
+		".skills",
+		filepath.Join(".claude", "skills"),
+	}
+
 	// Walk up from working directory
 	current := workingDir
 	for current != "" {
-		skillsDir := filepath.Join(current, ".skills")
-		if !seen[skillsDir] {
+		for _, rel := range candidates {
+			skillsDir := filepath.Join(current, rel)
+			if seen[skillsDir] {
+				continue
+			}
 			if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
 				dirs = append(dirs, skillsDir)
 				seen[skillsDir] = true
