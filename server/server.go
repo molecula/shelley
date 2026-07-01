@@ -530,6 +530,11 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/host-icon", http.HandlerFunc(s.handleHostIcon))
 	mux.Handle("/api/tools", http.HandlerFunc(s.handleTools))
 
+	// Slash commands and skills viewer API
+	mux.Handle("GET /api/commands", http.HandlerFunc(s.handleCommands))
+	mux.Handle("GET /api/user-skills", http.HandlerFunc(s.handleUserSkills))
+	mux.Handle("GET /api/user-skills/{name}", http.HandlerFunc(s.handleUserSkillContent))
+
 	// Version endpoints
 	mux.Handle("GET /version", http.HandlerFunc(s.handleVersion))
 	mux.Handle("GET /version-check", http.HandlerFunc(s.handleVersionCheck))
