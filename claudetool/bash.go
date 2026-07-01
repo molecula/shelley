@@ -197,6 +197,9 @@ func (b *BashTool) run(ctx context.Context, req bashInput) llm.ToolOut {
 		req.Command = bashkit.AddCoauthorTrailer(req.Command, "Co-authored-by: Shelley <shelley@exe.dev>")
 	}
 
+	// Try RTK command optimization if available.
+	req.Command, _ = rtkRewrite(req.Command)
+
 	timeout := req.timeout(b.Timeouts)
 
 	display := BashDisplayData{WorkingDir: wd}
