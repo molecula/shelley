@@ -189,17 +189,17 @@ func (s *PredictableService) Do(ctx context.Context, req *llm.Request) (*llm.Res
 	case "echo: foo":
 		return s.makeResponse("foo", inputTokens), nil
 
-	case "patch fail":
-		// Trigger a patch that will fail (file doesn't exist)
-		return s.makePatchToolResponse("/nonexistent/file/that/does/not/exist.txt", inputTokens), nil
+	case "edit fail":
+		// Trigger an edit that will fail (file doesn't exist)
+		return s.makeEditToolResponse("/nonexistent/file/that/does/not/exist.txt", inputTokens), nil
 
-	case "patch success":
-		// Trigger a patch that will succeed (using overwrite, which creates the file)
-		return s.makePatchToolResponseOverwrite("/tmp/test-patch-success.txt", inputTokens), nil
+	case "edit success":
+		// Trigger an edit that will succeed (using overwrite, which creates the file)
+		return s.makeEditToolResponseOverwrite("/tmp/test-edit-success.txt", inputTokens), nil
 
-	case "patch bad json":
-		// Trigger a patch with malformed JSON (simulates Anthropic sending invalid JSON)
-		return s.makeMalformedPatchToolResponse(inputTokens), nil
+	case "edit bad json":
+		// Trigger an edit with malformed JSON (simulates the model sending invalid JSON)
+		return s.makeMalformedEditToolResponse(inputTokens), nil
 
 	case "maxTokens":
 		// Simulate a max_tokens truncation
@@ -224,8 +224,8 @@ func (s *PredictableService) Do(ctx context.Context, req *llm.Request) (*llm.Res
 			return s.makeThinkingResponse(thoughts, inputTokens), nil
 		}
 
-		if filePath, ok := strings.CutPrefix(inputText, "patch: "); ok {
-			return s.makePatchToolResponse(filePath, inputTokens), nil
+		if filePath, ok := strings.CutPrefix(inputText, "edit: "); ok {
+			return s.makeEditToolResponse(filePath, inputTokens), nil
 		}
 
 		if rest, ok := strings.CutPrefix(inputText, "fail "); ok {
@@ -420,28 +420,28 @@ func (s *PredictableService) makeThinkingResponse(thoughts string, inputTokens u
 	}
 }
 
-// makePatchToolResponse creates a response that calls the patch tool
-func (s *PredictableService) makePatchToolResponse(filePath string, inputTokens uint64) *llm.Response {
-	// Properly marshal the patch data to avoid JSON escaping issues
+// makeEditToolResponse creates a response that calls the edit tool with a
+// range edit. On a nonexistent file this fails (no hashline anchors to
+// resolve), which the "edit fail" trigger relies on.
+func (s *PredictableService) makeEditToolResponse(filePath string, inputTokens uint64) *llm.Response {
 	toolInputData := map[string]interface{}{
 		"path": filePath,
-		"patches": []map[string]string{
+		"edits": []map[string]interface{}{
 			{
-				"operation": "replace",
-				"oldText":   "example",
-				"newText":   "updated example",
+				"loc":     map[string]interface{}{"range": map[string]string{"pos": "1#aaaa", "end": "1#aaaa"}},
+				"content": []string{"updated example"},
 			},
 		},
 	}
 	toolInputBytes, _ := json.Marshal(toolInputData)
 	toolInput := json.RawMessage(toolInputBytes)
-	responseText := fmt.Sprintf("I'll patch the file: %s", filePath)
+	responseText := fmt.Sprintf("I'll edit the file: %s", filePath)
 	outputTokens := uint64(len(responseText)/4 + len(toolInputBytes)/4)
 	if outputTokens == 0 {
 		outputTokens = 1
 	}
 	return &llm.Response{
-		ID:    fmt.Sprintf("pred-patch-%d", time.Now().UnixNano()),
+		ID:    fmt.Sprintf("pred-edit-%d", time.Now().UnixNano()),
 		Type:  "message",
 		Role:  llm.MessageRoleAssistant,
 		Model: "predictable-v1",
@@ -450,7 +450,7 @@ func (s *PredictableService) makePatchToolResponse(filePath string, inputTokens 
 			{
 				ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()%1000),
 				Type:      llm.ContentTypeToolUse,
-				ToolName:  "patch",
+				ToolName:  "edit",
 				ToolInput: toolInput,
 			},
 		},
@@ -463,14 +463,15 @@ func (s *PredictableService) makePatchToolResponse(filePath string, inputTokens 
 	}
 }
 
-// makePatchToolResponseOverwrite creates a response that uses overwrite operation (always succeeds)
-func (s *PredictableService) makePatchToolResponseOverwrite(filePath string, inputTokens uint64) *llm.Response {
+// makeEditToolResponseOverwrite creates a response that uses the overwrite
+// location (always succeeds; creates the file).
+func (s *PredictableService) makeEditToolResponseOverwrite(filePath string, inputTokens uint64) *llm.Response {
 	toolInputData := map[string]interface{}{
 		"path": filePath,
-		"patches": []map[string]string{
+		"edits": []map[string]interface{}{
 			{
-				"operation": "overwrite",
-				"newText":   "This is the new content of the file.\nLine 2\nLine 3\n",
+				"loc":     "overwrite",
+				"content": []string{"This is the new content of the file.", "Line 2", "Line 3"},
 			},
 		},
 	}
@@ -482,7 +483,7 @@ func (s *PredictableService) makePatchToolResponseOverwrite(filePath string, inp
 		outputTokens = 1
 	}
 	return &llm.Response{
-		ID:    fmt.Sprintf("pred-patch-overwrite-%d", time.Now().UnixNano()),
+		ID:    fmt.Sprintf("pred-edit-overwrite-%d", time.Now().UnixNano()),
 		Type:  "message",
 		Role:  llm.MessageRoleAssistant,
 		Model: "predictable-v1",
@@ -491,7 +492,7 @@ func (s *PredictableService) makePatchToolResponseOverwrite(filePath string, inp
 			{
 				ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()%1000),
 				Type:      llm.ContentTypeToolUse,
-				ToolName:  "patch",
+				ToolName:  "edit",
 				ToolInput: toolInput,
 			},
 		},
@@ -504,24 +505,23 @@ func (s *PredictableService) makePatchToolResponseOverwrite(filePath string, inp
 	}
 }
 
-// makeMalformedPatchToolResponse creates a response with malformed JSON that will fail to parse
-// This simulates when Anthropic sends back invalid JSON in the tool input
-func (s *PredictableService) makeMalformedPatchToolResponse(inputTokens uint64) *llm.Response {
-	// This malformed JSON has a string where an object is expected (patch field)
-	// Mimics the error: "cannot unmarshal string into Go struct field PatchInputOneSingular.patch"
-	malformedJSON := `{"path":"/home/agent/example.css","patch":"<parameter name=\"operation\">replace","oldText":".example {\n  color: red;\n}","newText":".example {\n  color: blue;\n}"}`
+// makeMalformedEditToolResponse creates a response with malformed JSON that will
+// fail to parse, simulating the model sending back invalid tool input.
+func (s *PredictableService) makeMalformedEditToolResponse(inputTokens uint64) *llm.Response {
+	// Malformed: "edits" should be an array of objects, not a bare string.
+	malformedJSON := `{"path":"/home/agent/example.css","edits":"<parameter name=\"loc\">overwrite","content":".example {\n  color: blue;\n}"}`
 	toolInput := json.RawMessage(malformedJSON)
 	return &llm.Response{
-		ID:    fmt.Sprintf("pred-patch-malformed-%d", time.Now().UnixNano()),
+		ID:    fmt.Sprintf("pred-edit-malformed-%d", time.Now().UnixNano()),
 		Type:  "message",
 		Role:  llm.MessageRoleAssistant,
 		Model: "predictable-v1",
 		Content: []llm.Content{
-			{Type: llm.ContentTypeText, Text: "I'll patch the file with the changes."},
+			{Type: llm.ContentTypeText, Text: "I'll edit the file with the changes."},
 			{
 				ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()%1000),
 				Type:      llm.ContentTypeToolUse,
-				ToolName:  "patch",
+				ToolName:  "edit",
 				ToolInput: toolInput,
 			},
 		},

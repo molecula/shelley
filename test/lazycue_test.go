@@ -173,7 +173,7 @@ func TestNewPageDraftOpensWithoutSpinner(t *testing.T) {
 //   - "echo: <text>"     -> echoes <text> back
 //   - "bash: <cmd>"      -> bash tool call, agent text "I'll run the command: <cmd>"
 //   - "think: <text>"    -> thinking content + "I've considered my approach."
-//   - "patch: <file>"    -> patch tool call, agent text "I'll patch the file: <file>"
+//   - "edit: <file>"     -> edit tool call, agent text "I'll edit the file: <file>"
 //   - "delay: <n>"       -> waits n seconds then "Delayed for <n> seconds"
 //   - "error: <msg>"     -> surfaces an LLM error in the UI
 //   - anything else      -> "edit predictable.go to add a response for that one..."
@@ -206,8 +206,8 @@ func TestNewPageThinkTool(t *testing.T) {
 	lazyTest(t, `Navigate to /new. Type "think: I need to analyze this problem" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for the agent text "I've considered my approach." to appear. The thinking content (an element with data-testid "thinking-content") should become visible, and the 💭 emoji should be visible on the page.`)
 }
 
-func TestNewPagePatchTool(t *testing.T) {
-	lazyTest(t, `Navigate to /new. Type "patch: test.txt" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for the agent text "I'll patch the file: test.txt" to appear. A completed tool call (an element with data-testid "tool-call-completed") should become visible, and the text "patch" should be visible on the page.`)
+func TestNewPageEditTool(t *testing.T) {
+	lazyTest(t, `Navigate to /new. Type "edit: test.txt" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for the agent text "I'll edit the file: test.txt" to appear. A completed tool call (an element with data-testid "tool-call-completed") should become visible.`)
 }
 
 func TestNewPageDefaultResponse(t *testing.T) {
@@ -359,8 +359,8 @@ func TestNewPageThinkToolHeader(t *testing.T) {
 	lazyTest(t, `Navigate to /new. Type "think: This is a long thought that should be truncated in the header display" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for the agent text "I've considered my approach." to appear. The thinking content element (".thinking-content") should be visible and contain the text "This is a long thought".`)
 }
 
-func TestNewPagePatchCollapseExpand(t *testing.T) {
-	lazyTest(t, `Navigate to /new. Type "patch success" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for a patch tool card (".patch-tool") to become visible; its details panel (".patch-tool-details") should be visible initially. Click the patch tool header (".patch-tool-header") to collapse it: the details panel (".patch-tool-details") should become hidden. Click the header again to expand: the details panel should become visible again.`)
+func TestNewPageEditCollapseExpand(t *testing.T) {
+	lazyTest(t, `Navigate to /new. Type "edit success" into the message input (data-testid "message-input") and click the send button (data-testid "send-button"). Wait for an edit tool card (".patch-tool") to become visible; its details panel (".patch-tool-details") should be visible initially. Click the tool header (".patch-tool-header") to collapse it: the details panel (".patch-tool-details") should become hidden. Click the header again to expand: the details panel should become visible again.`)
 }
 
 func TestNewPageMarkdownStripsForm(t *testing.T) {

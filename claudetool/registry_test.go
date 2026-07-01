@@ -36,10 +36,10 @@ func TestIsToolEnabled(t *testing.T) {
 func TestFilterTools(t *testing.T) {
 	tools := []*llm.Tool{
 		{Name: "bash"},
-		{Name: "patch"},
+		{Name: "edit"},
 		{Name: "browser"},
 	}
-	filtered := FilterTools(tools, map[string]string{"patch": "off"}, false)
+	filtered := FilterTools(tools, map[string]string{"edit": "off"}, false)
 	names := make([]string, 0, len(filtered))
 	for _, tt := range filtered {
 		names = append(names, tt.Name)

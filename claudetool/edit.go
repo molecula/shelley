@@ -16,6 +16,14 @@ import (
 
 const EditName = "edit"
 
+// PatchDisplayData is the structured diff data sent to the UI for display.
+// (Named for historical continuity: the frontend renders edit and legacy
+// patch tool results through the same diff component.)
+type PatchDisplayData struct {
+	Path string `json:"path"`
+	Diff string `json:"diff"`
+}
+
 type EditTool struct {
 	WorkingDir *MutableWorkingDir
 }

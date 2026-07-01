@@ -47,7 +47,7 @@ type ToolSetConfig struct {
 	// EnableBrowser enables browser tools.
 	EnableBrowser bool
 	// ModelID is the model being used for this conversation.
-	// Used to determine tool configuration (e.g., simplified patch schema for weaker models).
+	// Used to determine tool configuration for weaker vs stronger models.
 	ModelID string
 	// ReasoningLevel is the parent conversation's user-facing reasoning/thinking
 	// level (one of "off", "minimal", "low", "medium", "high", "xhigh", or ""
@@ -360,14 +360,6 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 		Env:              env,
 	}
 
-	// Use simplified patch schema for weaker models, full schema for sonnet/opus
-	simplified := !isStrongModel(cfg.ModelID)
-	patchTool := &PatchTool{
-		Simplified:       simplified,
-		WorkingDir:       wd,
-		ClipboardEnabled: true,
-	}
-
 	keywordTool := NewKeywordToolWithWorkingDir(cfg.LLMProvider, wd)
 
 	changeDirTool := &ChangeDirTool{
@@ -388,14 +380,13 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 	tools := []*llm.Tool{
 		bashTool.Tool(),
 		shellTool.Tool(),
-		patchTool.Tool(),
 		keywordTool.Tool(),
 		changeDirTool.Tool(),
 		outputIframeTool.Tool(),
 	}
 
-	// Hashline-anchored edit + read tools, alongside patch. Gated on
-	// IsToolEnabled; they share the same MutableWorkingDir as patch.
+	// Hashline-anchored edit + read are the file-editing tools (they replaced
+	// the old patch tool). Gated on IsToolEnabled; share the working dir.
 	if IsToolEnabled(EditName, cfg.ToolOverrides, cfg.DisableAllTools) {
 		editTool := &EditTool{WorkingDir: wd}
 		tools = append(tools, editTool.Tool())

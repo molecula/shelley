@@ -254,13 +254,13 @@ func extractPiFileOps(messages []llm.Message) (readFiles, modifiedFiles []string
 			if path == "" {
 				continue
 			}
-			// Shelley tool names that carry a "path" argument. There is no
-			// plain "read" tool (file reads go through bash); "patch" is the
-			// only file-mutating tool with a path.
+			// Shelley tool names that carry a "path" argument. "read" and the
+			// context/image readers only read; "edit" (and the legacy "patch"
+			// tool in historical conversations) mutate the file.
 			switch c.ToolName {
-			case "read_image", "read_context_file":
+			case "read", "read_image", "read_context_file":
 				read[path] = true
-			case "patch":
+			case "edit", "patch":
 				modified[path] = true
 			}
 		}

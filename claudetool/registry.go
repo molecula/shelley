@@ -17,7 +17,6 @@ type ToolInfo struct {
 var ToolRegistry = []ToolInfo{
 	{Name: "bash", Summary: "Run shell commands.", DefaultOn: true},
 	{Name: "shell", Summary: "Run shell commands.", DefaultOn: false},
-	{Name: "patch", Summary: "Precise edits to files.", DefaultOn: true},
 	{Name: "edit", Summary: "Apply hashline-anchored edits to files.", DefaultOn: true},
 	{Name: "read", Summary: "Read a file with hashline anchors for editing.", DefaultOn: true},
 	{Name: "keyword_search", Summary: "Search the codebase by keyword.", DefaultOn: true},
