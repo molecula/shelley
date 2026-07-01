@@ -773,7 +773,11 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 	ensureToolIDs(content)
 
 	usage := calculateUsage(gemReq, gemRes)
+	// Prefer the exe.dev gateway cost header; fall back to local pricing.
 	usage.CostUSD = llm.CostUSDFromResponse(gemRes.Header())
+	if usage.CostUSD == 0 {
+		usage.CostUSD = costUSD(cmp.Or(s.Model, DefaultModel), usage)
+	}
 
 	stopReason := llm.StopReasonEndTurn
 	for _, part := range content {

@@ -555,6 +555,26 @@ func CostUSDFromResponse(headers http.Header) float64 {
 	return cost
 }
 
+// ModelPrice holds per-million-token prices in USD for a model. When the
+// exe.dev gateway is not in use its Exedev-Gateway-Cost header is absent, so
+// each provider falls back to computing cost locally from the token counts it
+// already parses and a per-model price table.
+type ModelPrice struct {
+	Input      float64 // per 1M non-cached input tokens
+	Output     float64 // per 1M output tokens
+	CacheWrite float64 // per 1M cache-creation (write) input tokens
+	CacheRead  float64 // per 1M cache-read input tokens
+}
+
+// CostUSD returns the dollar cost of the given usage at these prices.
+func (p ModelPrice) CostUSD(u Usage) float64 {
+	const perMillion = 1_000_000.0
+	return (float64(u.InputTokens)*p.Input +
+		float64(u.OutputTokens)*p.Output +
+		float64(u.CacheCreationInputTokens)*p.CacheWrite +
+		float64(u.CacheReadInputTokens)*p.CacheRead) / perMillion
+}
+
 // Usage represents the billing and rate-limit usage.
 // Most LLM structs do not have JSON tags, to avoid accidental direct use in specific providers.
 // However, the front-end uses this struct, and it relies on its JSON serialization.

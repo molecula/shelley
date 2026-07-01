@@ -1207,8 +1207,12 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 				errs = errors.Join(errs, fmt.Errorf("attempt %d at %s: %w", attempts+1, time.Now().Format(time.DateTime), err))
 				continue
 			}
-			// Calculate and set the cost_usd field
+			// Prefer the exe.dev gateway cost header; fall back to local
+			// pricing (token counts x per-model price table) when absent.
 			response.Usage.CostUSD = llm.CostUSDFromResponse(resp.Header)
+			if response.Usage.CostUSD == 0 {
+				response.Usage.CostUSD = costUSD(cmp.Or(s.Model, DefaultModel), toLLMUsage(response.Usage))
+			}
 
 			endTime := time.Now()
 			result := toLLMResponse(response)

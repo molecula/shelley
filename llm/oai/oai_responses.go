@@ -422,7 +422,11 @@ func (s *ResponsesService) toLLMUsageFromResponses(usage responsesUsage, headers
 		CacheReadInputTokens: cached,
 		OutputTokens:         out,
 	}
+	// Prefer the exe.dev gateway cost header; fall back to local pricing.
 	u.CostUSD = llm.CostUSDFromResponse(headers)
+	if u.CostUSD == 0 {
+		u.CostUSD = costUSD(s.Model.ModelName, u)
+	}
 	return u
 }
 
