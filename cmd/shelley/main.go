@@ -17,6 +17,7 @@ import (
 	"shelley.exe.dev/client"
 	"shelley.exe.dev/db"
 	"shelley.exe.dev/llm/llmhttp"
+	"shelley.exe.dev/mcp"
 	"shelley.exe.dev/models"
 	"shelley.exe.dev/modelsources"
 	"shelley.exe.dev/server"
@@ -196,6 +197,21 @@ func runServe(global GlobalConfig, args []string) {
 	logger.Info("Available models", "models", strings.Join(availableModels, ", "))
 
 	toolSetConfig := setupToolSetConfig(llmManager, llmManager)
+
+	// Start MCP servers and discover their tools.
+	var mcpManager *claudetool.MCPManager
+	if len(llmConfig.MCPServers) > 0 {
+		var err error
+		mcpManager, err = claudetool.NewMCPManager(context.Background(), llmConfig.MCPServers)
+		if err != nil {
+			logger.Error("Failed to initialize MCP servers", "error", err)
+			os.Exit(1)
+		}
+		defer mcpManager.Close()
+		toolSetConfig.MCPTools = mcpManager.Tools()
+		toolSetConfig.MCPDeferredGroups = mcpManager.DeferredGroups()
+		logger.Info("MCP tools registered", "active", len(mcpManager.Tools()), "deferred_groups", len(mcpManager.DeferredGroups()))
+	}
 
 	// Create server
 	svr := server.NewServer(database, llmManager, toolSetConfig, logger, global.PredictableOnly, llmConfig.DefaultModel, *requireHeader)
@@ -415,6 +431,17 @@ func setupToolSetConfig(llmProvider claudetool.LLMServiceProvider, llmManager se
 	}
 }
 
+// mcpServerJSONConfig is the JSON representation of an MCP server in shelley.json.
+type mcpServerJSONConfig struct {
+	Name    string            `json:"name"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+	Defer   bool              `json:"defer"`
+}
+
 // buildLLMConfig composes the set of built-in models the server should
 // expose. Sources are evaluated in order; the first to claim a model ID
 // wins:
@@ -446,19 +473,40 @@ func buildLLMConfig(global GlobalConfig, logger *slog.Logger, database *db.DB) *
 		Logger: logger,
 	}
 
-	// Slack tokens: read from config file, with env vars taking precedence.
+	// Slack tokens and MCP servers: read from config file, with env vars
+	// taking precedence for the Slack tokens.
 	if global.ConfigPath != "" {
 		if data, err := os.ReadFile(global.ConfigPath); err == nil {
-			var slackCfg struct {
-				SlackBotToken string `json:"slack_bot_token"`
-				SlackAppToken string `json:"slack_app_token"`
+			var fileCfg struct {
+				SlackBotToken string                `json:"slack_bot_token"`
+				SlackAppToken string                `json:"slack_app_token"`
+				MCPServers    []mcpServerJSONConfig `json:"mcp_servers"`
 			}
-			if err := json.Unmarshal(data, &slackCfg); err == nil {
-				if slackCfg.SlackBotToken != "" {
-					cfg.SlackBotToken = slackCfg.SlackBotToken
+			if err := json.Unmarshal(data, &fileCfg); err == nil {
+				if fileCfg.SlackBotToken != "" {
+					cfg.SlackBotToken = fileCfg.SlackBotToken
 				}
-				if slackCfg.SlackAppToken != "" {
-					cfg.SlackAppToken = slackCfg.SlackAppToken
+				if fileCfg.SlackAppToken != "" {
+					cfg.SlackAppToken = fileCfg.SlackAppToken
+				}
+				// Convert MCP server configs.
+				for _, mcpCfg := range fileCfg.MCPServers {
+					if mcpCfg.Command == "" && mcpCfg.URL == "" {
+						logger.Warn("Skipping MCP server with neither command nor url", "name", mcpCfg.Name)
+						continue
+					}
+					cfg.MCPServers = append(cfg.MCPServers, mcp.ServerConfig{
+						Name:    mcpCfg.Name,
+						Command: mcpCfg.Command,
+						Args:    mcpCfg.Args,
+						Env:     mcpCfg.Env,
+						URL:     mcpCfg.URL,
+						Headers: mcpCfg.Headers,
+						Defer:   mcpCfg.Defer,
+					})
+				}
+				if len(cfg.MCPServers) > 0 {
+					logger.Info("MCP servers configured", "count", len(cfg.MCPServers))
 				}
 			}
 		}

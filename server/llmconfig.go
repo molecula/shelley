@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"shelley.exe.dev/db"
+	"shelley.exe.dev/mcp"
 	"shelley.exe.dev/models"
 )
 
@@ -42,4 +43,7 @@ type LLMConfig struct {
 	// Slack integration tokens (optional)
 	SlackBotToken string
 	SlackAppToken string
+
+	// MCPServers is the list of MCP server configurations (optional)
+	MCPServers []mcp.ServerConfig
 }

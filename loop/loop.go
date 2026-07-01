@@ -51,6 +51,10 @@ type Config struct {
 	// before the assistant message is recorded. Use this to flush any
 	// buffered stream deltas so they reach the UI before the full message.
 	OnStreamDone func()
+	// GetTools, if set, is called each iteration to get the current tool list.
+	// This supports dynamic tool loading (e.g., deferred MCP tool groups).
+	// If nil, Config.Tools is used as a static list.
+	GetTools func() []*llm.Tool
 }
 
 // Loop manages a conversation turn with an LLM including tool execution and message recording.
@@ -58,6 +62,7 @@ type Config struct {
 type Loop struct {
 	llm              llm.Service
 	tools            []*llm.Tool
+	getTools         func() []*llm.Tool
 	recordMessage    MessageRecordFunc
 	recordWarning    WarningRecordFunc
 	history          []llm.Message
@@ -96,6 +101,7 @@ func NewLoop(config Config) *Loop {
 		llm:              config.LLM,
 		history:          config.History,
 		tools:            config.Tools,
+		getTools:         config.GetTools,
 		recordMessage:    config.RecordMessage,
 		recordWarning:    config.RecordWarning,
 		messageQueue:     make([]llm.Message, 0),
@@ -273,6 +279,9 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 		l.mu.Lock()
 		messages := append([]llm.Message(nil), l.history...)
 		tools := l.tools
+		if l.getTools != nil {
+			tools = l.getTools()
+		}
 		system := l.system
 		llmService := l.llm
 		l.mu.Unlock()
@@ -691,9 +700,13 @@ func (l *Loop) executeToolCalls(ctx context.Context, content []llm.Content) erro
 
 		l.logger.Debug("executing tool", "name", c.ToolName, "id", c.ID)
 
-		// Find the tool
+		// Find the tool (use dynamic source if available)
+		currentTools := l.tools
+		if l.getTools != nil {
+			currentTools = l.getTools()
+		}
 		var tool *llm.Tool
-		for _, t := range l.tools {
+		for _, t := range currentTools {
 			if t.Name == c.ToolName {
 				tool = t
 				break
