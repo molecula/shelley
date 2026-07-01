@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -70,6 +71,19 @@ func main() {
 	// Parse all flags first
 	flag.Parse()
 	args := flag.Args()
+
+	// If -config was not supplied, fall back to the standard XDG location
+	// ($XDG_CONFIG_HOME/shelley/shelley.json) when it exists. Without this the
+	// config file (mcp_servers, notification channels, llm_gateway, etc.) is
+	// silently ignored when the service runs without an explicit -config flag.
+	if global.ConfigPath == "" {
+		if dir, err := os.UserConfigDir(); err == nil {
+			candidate := filepath.Join(dir, "shelley", "shelley.json")
+			if _, err := os.Stat(candidate); err == nil {
+				global.ConfigPath = candidate
+			}
+		}
+	}
 
 	if len(args) == 0 {
 		flag.Usage()
