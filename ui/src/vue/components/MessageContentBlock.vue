@@ -165,6 +165,9 @@ function componentForTool(toolName: string) {
     case "shell":
       return BashTool;
     case "patch":
+    // The hashline `edit` tool emits the same PatchDisplayData {path, diff}
+    // shape as patch, so it renders through the same inline-diff component.
+    case "edit":
       return PatchTool;
     case "browser":
       return BrowserTool;

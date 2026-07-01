@@ -223,6 +223,7 @@ import MessageContentBlock from "./MessageContentBlock.vue";
 import CitedText from "./CitedText.vue";
 import { coalesceContent } from "../../utils/coalesceContent";
 import MessageDisplayData from "./MessageDisplayData.vue";
+import { copyText } from "./gitGraphLayout";
 
 interface ToolDisplay {
   tool_use_id: string;
@@ -527,8 +528,10 @@ function handleMessageClick(e: MouseEvent) {
 function handleCopy() {
   const text = messageText.value;
   if (text) {
-    navigator.clipboard.writeText(text).catch((err) => {
-      console.error("Failed to copy text:", err);
+    // copyText falls back to a hidden-textarea + execCommand when the async
+    // Clipboard API is unavailable (e.g. non-secure contexts / older browsers).
+    copyText(text).then((ok) => {
+      if (!ok) console.error("Failed to copy text");
     });
   }
   showActionBar.value = false;

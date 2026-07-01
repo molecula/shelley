@@ -2185,6 +2185,30 @@ function handleScrollKeyDown(e: KeyboardEvent) {
   scrollToBottom();
 }
 
+// Global shortcuts scoped to the conversation view:
+//   Ctrl/Cmd+C        cancel the running agent turn (Stop)
+//   Ctrl/Cmd+Shift+D  open the directory picker
+function handleConversationShortcuts(e: KeyboardEvent) {
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+
+  // Ctrl/Cmd+Shift+D: open the directory picker.
+  if (e.shiftKey && (e.key === "d" || e.key === "D")) {
+    e.preventDefault();
+    showDirectoryPicker.value = true;
+    return;
+  }
+
+  // Ctrl/Cmd+C: stop the agent, but only while it's working and only when
+  // there's no text selection (so normal copy still works).
+  if (!e.shiftKey && !e.altKey && (e.key === "c" || e.key === "C") && agentWorking.value) {
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) return;
+    e.preventDefault();
+    handleCancel();
+  }
+}
+
 // ?diff=<hash> on mount opens the diff viewer for that commit.
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
@@ -2209,6 +2233,7 @@ onMounted(() => {
   window.addEventListener("beforeunload", saveScrollNow);
   document.addEventListener("visibilitychange", handleVisibilityChange);
   document.addEventListener("keydown", handleScrollKeyDown);
+  document.addEventListener("keydown", handleConversationShortcuts);
 });
 
 onUnmounted(() => {
@@ -2222,6 +2247,7 @@ onUnmounted(() => {
   window.removeEventListener("beforeunload", saveScrollNow);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("keydown", handleScrollKeyDown);
+  document.removeEventListener("keydown", handleConversationShortcuts);
   document.removeEventListener("mousedown", onAdvancedSettingsOutside);
   mobileMq.removeEventListener("change", onMobileChange);
   if (loadingProgressDelay) clearTimeout(loadingProgressDelay);
