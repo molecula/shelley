@@ -939,6 +939,7 @@ func (s *Server) getOrCreateConversationManager(ctx context.Context, conversatio
 		manager := NewConversationManager(conversationID, s.db, s.logger, s.toolSetConfig, recordMessage, recordTurnStart, onStateChange, s.streamPub)
 		manager.userEmail = userEmail
 		manager.serverPort = s.listenPort
+		manager.onNotify = s.PublishNotify
 		// Hydrate runs DB transactions, which fire OnCommit hooks. Those hooks
 		// (e.g. notify on the conversation list patch stream) acquire s.mu, so
 		// we must not hold it here.
@@ -992,6 +993,7 @@ func (s *Server) getOrCreateSubagentConversationManager(ctx context.Context, con
 
 		manager := NewConversationManager(conversationID, s.db, s.logger, subagentConfig, recordMessage, recordTurnStart, onStateChange, s.streamPub)
 		manager.serverPort = s.listenPort
+		manager.onNotify = s.PublishNotify
 		// Wire up done notification: when this subagent finishes, notify the parent
 		// by injecting a user message into the parent's loop so the LLM sees it.
 		manager.onDone = func() {
@@ -1709,6 +1711,57 @@ func (s *Server) publishConversationState(state ConversationState) {
 	for _, manager := range s.activeConversations {
 		manager.subpub.Broadcast(streamData)
 	}
+}
+
+// PublishNotify emits an on-demand "notify" notification event for a
+// conversation. Unlike agent_done, it is NOT suppressed for subagents — the
+// agent explicitly requested it. It dispatches to external channels and
+// broadcasts to every active conversation's stream (reaching the UI over SSE).
+// If title is empty, the conversation slug is used as the title.
+func (s *Server) PublishNotify(conversationID, message, title string) {
+	if message == "" {
+		return
+	}
+
+	slug := title
+	if slug == "" {
+		if conv, err := s.db.GetConversationByID(context.Background(), conversationID); err == nil && conv.Slug != nil {
+			slug = *conv.Slug
+		}
+	}
+
+	event := notifications.Event{
+		Type:           notifications.EventNotify,
+		ConversationID: conversationID,
+		Timestamp:      time.Now(),
+		Payload: notifications.NotifyPayload{
+			Hostname:          publicHostname(),
+			ConversationTitle: slug,
+			ConversationURL:   s.conversationURL(slug),
+			Message:           message,
+		},
+	}
+	s.notifDispatcher.Dispatch(context.Background(), event)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, manager := range s.activeConversations {
+		manager.subpub.Broadcast(StreamResponse{NotificationEvent: &event})
+	}
+}
+
+// getWorkingConversations returns a map of conversation IDs that are currently working.
+func (s *Server) getWorkingConversations() map[string]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	working := make(map[string]bool)
+	for id, manager := range s.activeConversations {
+		if manager.IsAgentWorking() {
+			working[id] = true
+		}
+	}
+	return working
 }
 
 // IsAgentWorking returns whether the agent is currently working on the given conversation.

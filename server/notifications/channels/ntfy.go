@@ -176,6 +176,25 @@ func (n *ntfy) formatMessage(event notifications.Event) *ntfyMessage {
 		}
 		return msg
 
+	case notifications.EventNotify:
+		msg := &ntfyMessage{
+			Topic:    n.topic,
+			Priority: n.donePriority,
+			Tags:     []string{"bell"},
+		}
+		if p, ok := event.Payload.(notifications.NotifyPayload); ok {
+			msg.Title = notifications.Title(p.Hostname, p.ConversationTitle)
+			msg.Click = p.ConversationURL
+			body := p.Message
+			if len(body) > ntfyMaxMessage {
+				body = body[:ntfyMaxMessage-3] + "..."
+			}
+			msg.Message = body
+		} else {
+			msg.Title = "Notification"
+		}
+		return msg
+
 	default:
 		return nil
 	}

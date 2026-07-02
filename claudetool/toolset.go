@@ -57,6 +57,9 @@ type ToolSetConfig struct {
 	// OnWorkingDirChange is called when the working directory changes.
 	// This can be used to persist the change to a database.
 	OnWorkingDirChange func(newDir string)
+	// Notify, if set, sends the user a desktop notification on demand.
+	// It is nil-safe: when nil the notify tool is not registered.
+	Notify func(ctx context.Context, message, title string)
 	// SubagentRunner is the runner for subagent conversations.
 	// If set, the subagent tool will be available.
 	SubagentRunner SubagentRunner
@@ -194,6 +197,8 @@ type OrchestratorToolSetConfig struct {
 	ToolOverrides map[string]string
 	// DisableAllTools disables every tool by default; ToolOverrides with "on" re-enable.
 	DisableAllTools bool
+	// Notify, if set, enables the notify tool (nil-safe).
+	Notify func(ctx context.Context, message, title string)
 }
 
 // NewOrchestratorToolSet creates a reduced tool set for orchestrator mode.
@@ -235,6 +240,11 @@ func NewOrchestratorToolSet(ctx context.Context, cfg OrchestratorToolSetConfig) 
 	// Output iframe tool (for showing visualizations to user)
 	outputIframeTool := &OutputIframeTool{WorkingDir: wd}
 	tools = append(tools, outputIframeTool.Tool())
+
+	if cfg.Notify != nil {
+		notifyTool := &NotifyTool{Notify: cfg.Notify}
+		tools = append(tools, notifyTool.Tool())
+	}
 
 	// Build available models list
 	var availableModels []AvailableModel
@@ -438,6 +448,11 @@ func NewToolSet(ctx context.Context, cfg ToolSetConfig) *ToolSet {
 	if cfg.SlackAPI != nil {
 		slackTool := &SlackTool{API: cfg.SlackAPI}
 		tools = append(tools, slackTool.Tool())
+	}
+
+	if cfg.Notify != nil {
+		notifyTool := &NotifyTool{Notify: cfg.Notify}
+		tools = append(tools, notifyTool.Tool())
 	}
 
 	var cleanup func()

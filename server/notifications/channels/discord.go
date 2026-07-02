@@ -121,6 +121,25 @@ func formatDiscordMessage(event notifications.Event) *discordMessage {
 		}
 		return &discordMessage{Embeds: []discordEmbed{embed}}
 
+	case notifications.EventNotify:
+		embed := discordEmbed{
+			Color:     0x3b82f6, // blue
+			Timestamp: event.Timestamp.Format(time.RFC3339),
+		}
+		if p, ok := event.Payload.(notifications.NotifyPayload); ok {
+			embed.Title = notifications.Title(p.Hostname, p.ConversationTitle)
+			embed.URL = p.ConversationURL
+			if p.Message != "" {
+				embed.Description = p.Message
+				if len(embed.Description) > discordMaxDescription {
+					embed.Description = embed.Description[:discordMaxDescription-3] + "..."
+				}
+			}
+		} else {
+			embed.Title = "Notification"
+		}
+		return &discordMessage{Embeds: []discordEmbed{embed}}
+
 	default:
 		return nil
 	}

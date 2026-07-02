@@ -199,6 +199,10 @@ type ConversationManager struct {
 	// is not a completion, so we suppress onDone for its working→idle
 	// transition. Guarded by cm.mu.
 	cancelling bool
+
+	// onNotify sends the user an on-demand desktop notification. Set by the
+	// server so the notify tool can reach Server.PublishNotify.
+	onNotify func(conversationID, message, title string)
 }
 
 // NewConversationManager constructs a manager with dependencies but defers hydration until needed.
@@ -1594,6 +1598,12 @@ func (cm *ConversationManager) ensureLoop(service llm.Service, modelID string) e
 		// The list patch stream refreshes from the Pool commit hook.
 	}
 
+	if cm.onNotify != nil {
+		toolSetConfig.Notify = func(ctx context.Context, message, title string) {
+			cm.onNotify(conversationID, message, title)
+		}
+	}
+
 	// Create a context with the conversation ID for LLM request recording/prefix dedup
 	baseCtx := llmhttp.WithConversationID(context.Background(), conversationID)
 	processCtx, cancel := context.WithTimeout(baseCtx, 12*time.Hour)
@@ -1616,6 +1626,7 @@ func (cm *ConversationManager) ensureLoop(service llm.Service, modelID string) e
 			ToolOverrides:        conversationOpts.ToolOverrides,
 			DisableAllTools:      conversationOpts.DisableAllTools,
 			ReasoningLevel:       conversationOpts.ThinkingLevel,
+			Notify:               toolSetConfig.Notify,
 		})
 	} else {
 		toolSetConfig.ToolOverrides = conversationOpts.ToolOverrides

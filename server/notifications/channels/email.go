@@ -122,6 +122,22 @@ func formatEmailMessage(event notifications.Event) (subject, body string) {
 		}
 		return subject, body
 
+	case notifications.EventNotify:
+		if p, ok := event.Payload.(notifications.NotifyPayload); ok {
+			subject = notifications.Title(p.Hostname, p.ConversationTitle)
+			var parts []string
+			if p.ConversationURL != "" {
+				parts = append(parts, p.ConversationURL)
+			}
+			if p.Message != "" {
+				parts = append(parts, "", p.Message)
+			}
+			body = strings.Join(parts, "\n")
+		} else {
+			subject = "Notification"
+		}
+		return subject, body
+
 	default:
 		return "", ""
 	}

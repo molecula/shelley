@@ -140,6 +140,19 @@ func (c *WebPushChannel) formatPayload(event notifications.Event) *pushPayload {
 			URL:   p.ConversationURL,
 		}
 
+	case notifications.EventNotify:
+		p, ok := event.Payload.(notifications.NotifyPayload)
+		if !ok {
+			return &pushPayload{Title: "Shelley", Body: "Notification"}
+		}
+		title := notifications.Title(p.Hostname, p.ConversationTitle)
+		return &pushPayload{
+			Title: title,
+			Body:  p.Message,
+			Tag:   "shelley-notify-" + event.ConversationID,
+			URL:   p.ConversationURL,
+		}
+
 	default:
 		return nil
 	}
