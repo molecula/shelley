@@ -37,3 +37,39 @@
     - `ui/src/vue/components/tools/BrowserTool.vue` (if the tool is a browser action — this component
       reads the `action` field from the input and dispatches to the right sub-component)
     - `loop/predictable.go` (the "tool smorgasbord" demo response)
+
+## Deploying to the local systemd instance (safe install/restart)
+
+This host runs Shelley as a systemd **user** service (`systemctl --user … shelley`),
+binary at `~/.local/bin/shelley serve`, DB at `~/shelley.db`. To ship changes:
+
+1. **Rebuild first, always.** `make build`. The embedded UI staleness check
+   (`ui.EnforceFreshBuild`, runs on `serve`) will exit(1) if any `ui/src` file is
+   newer than the embedded `ui/dist` — so an *old* binary won't even start once
+   you've edited `ui/src`. Rebuild so `dist` is fresh, then install.
+2. **Back up before cutover:** the binary (`cp ~/.local/bin/shelley ~/.local/bin/shelley.bak`)
+   and, if any DB migration is involved, the DB (`cp ~/shelley.db ~/shelley.db.bak`).
+3. **Install with unlink-then-copy, not plain `cp`.** Overwriting the running binary
+   in place fails with `Text file busy` (ETXTBSY). Do `rm -f ~/.local/bin/shelley &&
+   cp bin/shelley ~/.local/bin/shelley` (or `mv`, which is what `make install` uses —
+   rename replaces the dir entry; the running process keeps its inode until restart).
+4. **Restart & verify:** `systemctl --user restart shelley`, then poll
+   `curl -s localhost:9000/version` (check the `commit`), and
+   `journalctl --user -u shelley.service -n 30` for a clean start (no crash-loop /
+   `Main process exited`). A large-DB FTS migration can take ~30–60s before it serves.
+5. **Rollback:** restore the binary backup (unlink-then-copy) and, if migrations ran,
+   the DB backup; `systemctl --user reset-failed shelley && systemctl --user restart shelley`.
+
+**Migration-lineage gotcha (one-time, when moving this DB onto upstream):** the
+`migrations` table has `migration_number` as PRIMARY KEY, and the runner marks
+migrations applied **by name**. A DB built on the old fork can hold a different
+migration at a number that upstream reuses (e.g. old `018-push-subscriptions` vs
+upstream `018-add-reasoning-effort`) → startup dies with
+`UNIQUE constraint failed: migrations.migration_number`. Fix by renumbering the
+diverged row to its new identity (e.g. push → 034) so the number is freed and the
+renamed migration is treated as already-applied. **Always dry-run the reconciliation
+on a *copy* of the DB with the new binary on a spare port** (`shelley -db /tmp/copy.db
+serve -port 9099 -socket none`) before touching the live DB.
+
+Note: you are usually **not** running under this service (check `pstree -ps $$`); if
+you ever are, don't `pkill -f shelley` or restart naively — it'll kill your own turn.
