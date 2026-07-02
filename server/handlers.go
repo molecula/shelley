@@ -681,15 +681,8 @@ func (s *Server) serveIndexWithInit(w http.ResponseWriter, r *http.Request, fs h
 	defaultModel := s.effectiveDefaultModel(modelList)
 	markDefaultModel(modelList, defaultModel)
 
-	// Get hostname (add .exe.xyz suffix if no dots, matching system_prompt.go)
-	hostname := "localhost"
-	if h, err := os.Hostname(); err == nil {
-		if !strings.Contains(h, ".") {
-			hostname = h + ".exe.xyz"
-		} else {
-			hostname = h
-		}
-	}
+	// Public hostname (adds the .exe.xyz proxy suffix only on exe.dev VMs).
+	hostname := publicHostname()
 
 	// Get default working directory
 	defaultCwd, err := os.Getwd()

@@ -695,13 +695,7 @@ func collectSystemData(workingDir string) (*SystemPromptData, error) {
 	// Run the remaining cheap synchronous probes while the walks are in flight.
 	data.IsSudoAvailable = isSudoAvailable()
 	if data.IsExeDev {
-		if hostname, err := os.Hostname(); err == nil {
-			// If hostname doesn't contain dots, add .exe.xyz suffix
-			if !strings.Contains(hostname, ".") {
-				hostname = hostname + ".exe.xyz"
-			}
-			data.Hostname = hostname
-		}
+		data.Hostname = publicHostname()
 		data.DefaultPort = exeDevDefaultPort()
 	}
 

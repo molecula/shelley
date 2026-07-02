@@ -1566,15 +1566,21 @@ func (s *Server) publishConversationListUpdate(update ConversationListUpdate) {
 	}
 }
 
-// publicHostname returns the server's public hostname.
+// publicHostname returns the server's public hostname. On exe.dev VMs
+// (detected by the /exe.dev directory) a dotless hostname is expanded to the
+// public <name>.exe.xyz proxy domain; on any other host the bare system
+// hostname is used as-is.
 func publicHostname() string {
-	if h, err := os.Hostname(); err == nil {
-		if !strings.Contains(h, ".") {
+	h, err := os.Hostname()
+	if err != nil || h == "" {
+		return "localhost"
+	}
+	if !strings.Contains(h, ".") {
+		if _, statErr := os.Stat("/exe.dev"); statErr == nil {
 			return h + ".exe.xyz"
 		}
-		return h
 	}
-	return "localhost"
+	return h
 }
 
 // conversationURL returns the full URL for a conversation, using slug if available.
