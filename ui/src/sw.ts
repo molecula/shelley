@@ -1,6 +1,12 @@
 /// <reference lib="webworker" />
 
-declare const self: ServiceWorkerGlobalScope;
+export {};
+
+// The ambient DOM lib (loaded for the rest of the app) types the global `self`
+// as a Window, so we can't redeclare it. Cast once to the service-worker scope;
+// using `sw.addEventListener` gives the callbacks their correct SW event types
+// (PushEvent, NotificationEvent, ExtendableEvent).
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
 interface PushPayload {
   title?: string;
@@ -9,7 +15,7 @@ interface PushPayload {
   url?: string;
 }
 
-self.addEventListener("push", (event) => {
+sw.addEventListener("push", (event) => {
   let data: PushPayload = {};
   try {
     data = event.data?.json() ?? {};
@@ -26,30 +32,30 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(sw.registration.showNotification(title, options));
 });
 
-self.addEventListener("notificationclick", (event) => {
+sw.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url: string = (event.notification.data as { url?: string })?.url || "/";
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+    sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
         if ("focus" in client) {
-          return client.focus();
+          return (client as WindowClient).focus();
         }
       }
-      return self.clients.openWindow(url);
+      return sw.clients.openWindow(url);
     }),
   );
 });
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+sw.addEventListener("install", (event) => {
+  event.waitUntil(sw.skipWaiting());
 });
 
-// Take control of all pages immediately on activation
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+// Take control of all pages immediately on activation.
+sw.addEventListener("activate", (event) => {
+  event.waitUntil(sw.clients.claim());
 });

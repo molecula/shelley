@@ -143,6 +143,10 @@ const TOOL_COMPONENTS: Record<string, any> = {
   bash: BashTool,
   shell: BashTool,
   patch: PatchTool,
+  // The hashline `edit` tool emits the same PatchDisplayData {path, diff}
+  // shape as patch, so it renders through the same diff component. (patch is
+  // kept for historical tool-results in older conversations.)
+  edit: PatchTool,
   browser: BrowserTool,
   screenshot: ScreenshotTool,
   read_image: ReadImageTool,
@@ -184,7 +188,7 @@ const toolComponentProps = computed<Record<string, unknown>>(() => {
     executionTime: executionTime.value,
     display: props.display,
   };
-  if (props.toolName === "patch" && props.onCommentTextChange) {
+  if ((props.toolName === "patch" || props.toolName === "edit") && props.onCommentTextChange) {
     base.onCommentTextChange = props.onCommentTextChange;
   }
   if (props.streamingOutput !== undefined) {

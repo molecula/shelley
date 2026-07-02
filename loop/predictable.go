@@ -825,18 +825,18 @@ func (s *PredictableService) makeToolSmorgasbordResponse(inputTokens uint64) *ll
 		Thinking: "I'm thinking about the best approach for this task. Let me consider all the options available.",
 	})
 
-	// patch tool
-	patchInput, _ := json.Marshal(map[string]interface{}{
+	// edit tool
+	editInput, _ := json.Marshal(map[string]interface{}{
 		"path": "/tmp/example.txt",
-		"patches": []map[string]string{
-			{"operation": "replace", "oldText": "foo", "newText": "bar"},
+		"edits": []map[string]interface{}{
+			{"loc": "overwrite", "content": []string{"bar"}},
 		},
 	})
 	content = append(content, llm.Content{
-		ID:        fmt.Sprintf("tool_patch_%d", (baseNano+2)%1000),
+		ID:        fmt.Sprintf("tool_edit_%d", (baseNano+2)%1000),
 		Type:      llm.ContentTypeToolUse,
-		ToolName:  "patch",
-		ToolInput: json.RawMessage(patchInput),
+		ToolName:  "edit",
+		ToolInput: json.RawMessage(editInput),
 	})
 
 	// browser: screenshot action
