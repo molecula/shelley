@@ -62,7 +62,7 @@
              over Remote-SSH. Only shown when there's a working dir and the
              server reported its SSH host. -->
         <button
-          v-if="hasCwd && sshHost"
+          v-if="hasCwd && sshHost && !isMobile"
           class="btn-icon"
           :aria-label="preferredEditor === 'cursor' ? t('openInCursor') : t('openInVscode')"
           :title="preferredEditor === 'cursor' ? t('openInCursor') : t('openInVscode')"
