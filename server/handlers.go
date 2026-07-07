@@ -684,6 +684,15 @@ func (s *Server) serveIndexWithInit(w http.ResponseWriter, r *http.Request, fs h
 	// Public hostname (adds the .exe.xyz proxy suffix only on exe.dev VMs).
 	hostname := publicHostname()
 
+	// Bare system hostname for editor Remote-SSH deep links. This must NOT carry
+	// the .exe.xyz proxy suffix that publicHostname() adds on exe.dev VMs — the
+	// UI's "Open in VSCode/Cursor" button builds a vscode-remote/ssh-remote URI
+	// that shells out to `ssh <host>`, which on fabs resolves via Tailscale.
+	sshHost, _ := os.Hostname()
+	if sshHost == "" {
+		sshHost = "localhost"
+	}
+
 	// Get default working directory
 	defaultCwd, err := os.Getwd()
 	if err != nil {
@@ -702,6 +711,7 @@ func (s *Server) serveIndexWithInit(w http.ResponseWriter, r *http.Request, fs h
 		"models":              modelList,
 		"default_model":       defaultModel,
 		"hostname":            hostname,
+		"ssh_host":            sshHost,
 		"default_cwd":         defaultCwd,
 		"home_dir":            homeDir,
 		"user_agents_md_path": userAgentsMdPath,

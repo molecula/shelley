@@ -145,6 +145,23 @@
         <span v-if="hasUpdate" class="version-menu-dot" />
       </button>
 
+      <!-- "Open in…" editor target: VSCode / Cursor -->
+      <template v-if="hasSshHost">
+        <div class="overflow-menu-divider" />
+        <div class="overflow-menu-control">
+          <SelectButton
+            :model-value="preferredEditor"
+            :options="editorOptions"
+            option-value="value"
+            option-label="label"
+            data-key="value"
+            :allow-empty="false"
+            :aria-label="t('editor')"
+            @update:model-value="onEditorChange"
+          />
+        </div>
+      </template>
+
       <!-- Theme: System / Light / Dark -->
       <div class="overflow-menu-divider" />
       <div class="overflow-menu-control">
@@ -252,6 +269,11 @@ import { useI18n } from "../composables/i18n";
 import { useMarkdownMode, type MarkdownMode } from "../composables/markdownMode";
 import { type ThemeMode, getStoredTheme, setStoredTheme, applyTheme } from "../../services/theme";
 import {
+  preferredEditor,
+  setPreferredEditor,
+  type EditorKind,
+} from "../../services/editorPreference";
+import {
   isChannelEnabled,
   setChannelEnabled,
   getBrowserNotificationState,
@@ -321,6 +343,18 @@ function onThemeChange(mode: ThemeMode) {
   theme.value = mode;
   setStoredTheme(mode);
   applyTheme(mode);
+}
+
+// ---- "Open in editor" target (VSCode / Cursor) ----
+// Only meaningful when the server reported its SSH host (i.e. running on a fab
+// or other Remote-SSH-reachable box).
+const hasSshHost = !!window.__SHELLEY_INIT__?.ssh_host;
+const editorOptions = [
+  { value: "vscode" as EditorKind, label: "VSCode" },
+  { value: "cursor" as EditorKind, label: "Cursor" },
+];
+function onEditorChange(editor: EditorKind) {
+  setPreferredEditor(editor);
 }
 
 // ---- Browser notifications (on / off) ----
