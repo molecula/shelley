@@ -138,6 +138,7 @@ export interface InitData {
   default_cwd?: string;
   home_dir?: string;
   hostname?: string;
+  ssh_host?: string; // bare system hostname for editor Remote-SSH deep links
   terminal_url?: string;
   links?: Link[];
   user_agents_md_path?: string;

@@ -58,6 +58,26 @@
           </svg>
         </button>
 
+        <!-- Open the conversation's worktree in a local VSCode/Cursor window
+             over Remote-SSH. Only shown when there's a working dir and the
+             server reported its SSH host. -->
+        <button
+          v-if="hasCwd && sshHost"
+          class="btn-icon"
+          :aria-label="preferredEditor === 'cursor' ? t('openInCursor') : t('openInVscode')"
+          :title="preferredEditor === 'cursor' ? t('openInCursor') : t('openInVscode')"
+          @click="openInEditor"
+        >
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              :stroke-width="2"
+              d="M8 9l-4 3 4 3m8-6l4 3-4 3M14 5l-4 14"
+            />
+          </svg>
+        </button>
+
         <!-- Overflow menu (PrimeVue Popover + SelectButton/Select) -->
         <ChatOverflowMenu
           :has-cwd="hasCwd"
@@ -358,6 +378,7 @@ import {
   pickDraft,
 } from "../../services/draftCache";
 import { setFaviconStatus } from "../../services/favicon";
+import { preferredEditor, buildEditorUri } from "../../services/editorPreference";
 import { useMarkdownMode } from "../composables/markdownMode";
 import { useI18n } from "../composables/i18n";
 import { useDraftAutosave } from "../composables/draftAutosave";
@@ -588,6 +609,7 @@ let lastGeneration: { id: string | null; gen: number } | null = null;
 const terminalURL = window.__SHELLEY_INIT__?.terminal_url || null;
 const links = window.__SHELLEY_INIT__?.links || [];
 const hostname = window.__SHELLEY_INIT__?.hostname || "localhost";
+const sshHost = window.__SHELLEY_INIT__?.ssh_host || "";
 
 // ---- tool overrides (persisted) ----
 const TOOL_OVERRIDES_KEY = "shelley.toolOverrides";
@@ -1443,6 +1465,21 @@ function openTerminalUrl() {
   if (!terminalURL) return;
   const url = terminalURL.replace("WORKING_DIR", encodeURIComponent(cwd));
   window.open(url, "_blank");
+}
+// Open the conversation's worktree in a local VSCode/Cursor window. When the
+// browser reaches Shelley over loopback (running locally) the editor opens the
+// path directly; otherwise it tunnels in over Remote-SSH, where sshHost is the
+// fab's bare hostname (resolved via Tailscale on the laptop) and cwd is the
+// worktree path on the fab.
+function openInEditor() {
+  const cwd = props.currentConversation?.cwd || selectedCwd.value || "";
+  const locationHost = window.location.hostname;
+  const isLocal = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(locationHost);
+  if (!cwd || (!sshHost && !isLocal)) return;
+  window.open(
+    buildEditorUri(preferredEditor.value, { locationHost, sshHost, path: cwd }),
+    "_blank",
+  );
 }
 function openExport() {
   window.open(`/export/${props.conversationId}`, "_blank", "noopener");

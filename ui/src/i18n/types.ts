@@ -15,6 +15,9 @@ export interface TranslationKeys {
   diffs: string;
   gitGraph: string;
   terminal: string;
+  openInVscode: string;
+  openInCursor: string;
+  editor: string;
   archiveConversation: string;
   exportConversation: string;
   checkForNewVersion: string;
