@@ -248,6 +248,12 @@ func All() []Model {
 			Build: gemSvc("gemini-3-pro-preview"),
 		},
 		{
+			ID: "kimi-k2.7-code-fireworks", Provider: ProviderFireworks,
+			Description: "Kimi K2.7 Code on Fireworks", APIModelName: oai.KimiK27CodeFireworks.ModelName,
+			APIType: APITypeOpenAIChat, DefaultBaseURL: DefaultFireworksBaseURL,
+			Build: oaiChatSvc(oai.KimiK27CodeFireworks, "fireworks"),
+		},
+		{
 			ID: "kimi-k2.6-fireworks", Provider: ProviderFireworks,
 			Description: "Kimi K2.6 on Fireworks", APIModelName: oai.KimiK26Fireworks.ModelName,
 			APIType: APITypeOpenAIChat, DefaultBaseURL: DefaultFireworksBaseURL,
@@ -342,6 +348,12 @@ func All() []Model {
 			Description: "Qwen 3.6 Plus on Fireworks", APIModelName: oai.Qwen36PlusFireworks.ModelName,
 			APIType: APITypeOpenAIChat, DefaultBaseURL: DefaultFireworksBaseURL,
 			Build: oaiChatSvc(oai.Qwen36PlusFireworks, "fireworks"),
+		},
+		{
+			ID: "nemotron-3-ultra-nvfp4-fireworks", Provider: ProviderFireworks,
+			Description: "NVIDIA Nemotron 3 Ultra NVFP4 on Fireworks", APIModelName: oai.Nemotron3UltraFireworks.ModelName,
+			APIType: APITypeOpenAIChat, DefaultBaseURL: DefaultFireworksBaseURL,
+			Build: oaiChatSvc(oai.Nemotron3UltraFireworks, "fireworks"),
 		},
 		{
 			ID: "gpt-oss-20b-fireworks", Provider: ProviderFireworks, Tags: "slug",

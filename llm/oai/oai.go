@@ -328,9 +328,29 @@ var (
 		SupportsImages:     false,
 	}
 
+	KimiK27CodeFireworks = Model{
+		UserName:           "kimi-k2.7-code-fireworks",
+		ModelName:          "accounts/fireworks/models/kimi-k2p7-code",
+		URL:                FireworksURL,
+		APIKeyEnv:          FireworksAPIKeyEnv,
+		IsReasoningModel:   false,
+		UseSimplifiedPatch: false,
+		SupportsImages:     false,
+	}
+
 	KimiK26Fireworks = Model{
 		UserName:           "kimi-k2.6-fireworks",
 		ModelName:          "accounts/fireworks/models/kimi-k2p6",
+		URL:                FireworksURL,
+		APIKeyEnv:          FireworksAPIKeyEnv,
+		IsReasoningModel:   false,
+		UseSimplifiedPatch: false,
+		SupportsImages:     false,
+	}
+
+	Nemotron3UltraFireworks = Model{
+		UserName:           "nemotron-3-ultra-nvfp4-fireworks",
+		ModelName:          "accounts/fireworks/models/nemotron-3-ultra-nvfp4",
 		URL:                FireworksURL,
 		APIKeyEnv:          FireworksAPIKeyEnv,
 		IsReasoningModel:   false,
@@ -552,7 +572,9 @@ var ModelsRegistry = []Model{
 	DevstralSmall,
 	GLM52Fireworks,
 	GLM51Fireworks,
+	KimiK27CodeFireworks,
 	KimiK26Fireworks,
+	Nemotron3UltraFireworks,
 	Qwen36PlusFireworks,
 	GPTOSS120B,
 	GPTOSS20B,
