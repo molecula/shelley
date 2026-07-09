@@ -1,6 +1,30 @@
 package slack
 
-import "testing"
+import (
+	"testing"
+
+	"shelley.exe.dev/claudetool"
+)
+
+func TestRenderReplyContext(t *testing.T) {
+	b := &Bot{botUID: "UBOT"}
+	msgs := []claudetool.SlackMessage{
+		{User: "UAAA", Text: "the parent message", Timestamp: "1.0"},
+		{User: "UBBB", Text: "a follow-up", Timestamp: "2.0"},
+		{User: "UCCC", Text: "<@UBOT> what does this mean?", Timestamp: "3.0"}, // the mention itself
+	}
+	got := b.renderReplyContext(msgs, "3.0")
+	want := "Replying to the following message(s):\n<@UAAA>: the parent message\n<@UBBB>: a follow-up"
+	if got != want {
+		t.Errorf("renderReplyContext:\n got: %q\nwant: %q", got, want)
+	}
+
+	// Only the mention present -> no parent context.
+	only := []claudetool.SlackMessage{{User: "UCCC", Text: "<@UBOT> hi", Timestamp: "3.0"}}
+	if got := b.renderReplyContext(only, "3.0"); got != "" {
+		t.Errorf("expected empty reply context, got %q", got)
+	}
+}
 
 func TestChunkText(t *testing.T) {
 	tests := []struct {

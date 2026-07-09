@@ -15,6 +15,8 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
+
+	"shelley.exe.dev/claudetool"
 )
 
 // ConversationAPI is the interface the Slack bot needs from the Shelley server.
@@ -80,11 +82,11 @@ func NewBot(cfg Config) (*Bot, error) {
 	socket := socketmode.New(api)
 
 	return &Bot{
-		api:        api,
-		socket:     socket,
-		convo:      cfg.Convo,
-		logger:     cfg.Logger.With("component", "slack"),
-		model:      cfg.Model,
+		api:          api,
+		socket:       socket,
+		convo:        cfg.Convo,
+		logger:       cfg.Logger.With("component", "slack"),
+		model:        cfg.Model,
 		threads:      make(map[string]string),
 		reverse:      make(map[string]string),
 		lastPosted:   make(map[string]string),
@@ -218,8 +220,15 @@ func (b *Bot) handleMention(ctx context.Context, event *slackevents.AppMentionEv
 		return
 	}
 
-	// Create a new Shelley conversation
+	// Create a new Shelley conversation. If the mention is a reply inside an
+	// existing thread, include the message(s) being replied to so the agent can
+	// see which message the user is responding to.
 	slackContext := fmt.Sprintf("[Slack message from <@%s> in <#%s>]\n\n%s", event.User, channel, text)
+	if event.ThreadTimeStamp != "" && event.ThreadTimeStamp != event.TimeStamp {
+		if parent := b.replyContext(ctx, channel, event.ThreadTimeStamp, event.TimeStamp); parent != "" {
+			slackContext = fmt.Sprintf("[Slack message from <@%s> in <#%s>, replying in a thread]\n\n%s\n\n%s", event.User, channel, parent, text)
+		}
+	}
 	convID, err := b.convo.NewConversation(ctx, slackContext, b.model)
 	if err != nil {
 		b.logger.Error("failed to create conversation", "error", err, "channel", channel)
@@ -236,6 +245,43 @@ func (b *Bot) handleMention(ctx context.Context, event *slackevents.AppMentionEv
 	b.threads[key] = convID
 	b.reverse[convID] = key
 	b.mu.Unlock()
+}
+
+// replyContext fetches the thread that a mention is replying into and renders
+// the parent messages (everything up to, but excluding, the mention itself) so
+// the agent can see which message(s) the user is responding to. Returns an
+// empty string if the thread can't be fetched or contains no parent messages.
+func (b *Bot) replyContext(ctx context.Context, channel, threadTS, mentionTS string) string {
+	msgs, err := b.GetThread(ctx, channel, threadTS, 20)
+	if err != nil {
+		b.logger.Warn("failed to fetch thread for reply context", "error", err, "channel", channel, "thread_ts", threadTS)
+		return ""
+	}
+	return b.renderReplyContext(msgs, mentionTS)
+}
+
+// renderReplyContext formats parent thread messages (excluding the mention
+// message itself) into a human-readable block. Returns "" if empty.
+func (b *Bot) renderReplyContext(msgs []claudetool.SlackMessage, mentionTS string) string {
+	var lines []string
+	for _, m := range msgs {
+		if m.Timestamp == mentionTS {
+			continue // skip the mention message itself
+		}
+		text := strings.TrimSpace(b.stripMention(m.Text))
+		if text == "" {
+			continue
+		}
+		if m.User != "" {
+			lines = append(lines, fmt.Sprintf("<@%s>: %s", m.User, text))
+		} else {
+			lines = append(lines, text)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "Replying to the following message(s):\n" + strings.Join(lines, "\n")
 }
 
 // handleThreadMessage handles a message in a thread that the bot is watching.
