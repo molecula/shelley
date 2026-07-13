@@ -346,9 +346,7 @@ import { useI18n } from "../composables/i18n";
 import {
   sortConversations,
   sortConversationsByBucket,
-  maxBucket,
   applyStableOrder,
-  applyStableKeyOrder,
   neighborAfterRemoval,
   type SortMode,
 } from "../../utils/conversationSort";
@@ -964,27 +962,25 @@ const groupedConversations = computed<[string, Group][] | null>(() => {
     nextGroupOrder[key] = order;
   }
 
-  // Order groups. For "activity", keep the maxBucket + stable-key behavior.
-  // For "created"/"name", order groups by their first (already-sorted)
-  // conversation so groups follow the same sort as their contents.
-  let sorted: [string, Group][];
-  if (sortBy.value === "activity") {
-    const desiredKeys = [...groups.entries()]
-      .sort((a, b) => maxBucket(b[1].conversations) - maxBucket(a[1].conversations))
-      .map(([k]) => k);
-    const stableKeys = applyStableKeyOrder(desiredKeys, groupKeysOrder);
-    groupKeysOrder = stableKeys;
-    sorted = stableKeys.map((k) => [k, groups.get(k)!]);
-  } else {
-    const entries = [...groups.entries()].sort((a, b) => {
-      const aFirst = a[1].conversations[0];
-      const bFirst = b[1].conversations[0];
-      if (!aFirst || !bFirst) return 0;
-      return sortConversations([aFirst, bFirst], sortBy.value)[0] === aFirst ? -1 : 1;
-    });
-    groupKeysOrder = entries.map(([k]) => k);
-    sorted = entries.map(([k, g]) => [k, g]);
-  }
+  // Order groups by directory creation order (newest-created dir first),
+  // independent of the within-group sort. A directory's creation time is the
+  // creation time of its earliest conversation; conversation IDs are ULIDs, so
+  // the smallest ID in a group marks when the directory first appeared. This
+  // keeps the group order stable as you work, while conversations inside each
+  // group still follow the selected sort (e.g. most-recent activity first).
+  const groupCreation = (g: Group): string =>
+    g.conversations.reduce(
+      (min, c) => (c.conversation_id < min ? c.conversation_id : min),
+      g.conversations[0]?.conversation_id ?? "",
+    );
+  const entries = [...groups.entries()].sort((a, b) => {
+    const ac = groupCreation(a[1]);
+    const bc = groupCreation(b[1]);
+    if (ac === bc) return 0;
+    return ac < bc ? 1 : -1;
+  });
+  groupKeysOrder = entries.map(([k]) => k);
+  const sorted: [string, Group][] = entries.map(([k, g]) => [k, g]);
 
   if (ungrouped.length > 0) {
     const { items, order } = sortListWithOrder(ungrouped, groupOrder["__ungrouped__"] || []);
