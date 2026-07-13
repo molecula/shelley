@@ -277,6 +277,11 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { api } from "../../services/api";
 import { useEscapeClose } from "../composables/escapeClose";
+import {
+  computeTabCompletion,
+  parseInputPath,
+  resolveSelectedPath,
+} from "./directoryPickerPath";
 
 interface DirectoryEntry {
   name: string;
@@ -326,14 +331,6 @@ const displayDir = ref<CachedDirectory | null>(null);
 const filterPrefix = ref("");
 let expectedPath = "";
 
-function parseInputPath(path: string): { dirPath: string; prefix: string } {
-  if (!path) return { dirPath: "", prefix: "" };
-  if (path.endsWith("/")) return { dirPath: path.slice(0, -1) || "/", prefix: "" };
-  const lastSlash = path.lastIndexOf("/");
-  if (lastSlash === -1) return { dirPath: "", prefix: path };
-  if (lastSlash === 0) return { dirPath: "/", prefix: path.slice(1) };
-  return { dirPath: path.slice(0, lastSlash), prefix: path.slice(lastSlash + 1) };
-}
 
 async function loadDirectory(path: string): Promise<CachedDirectory | null> {
   const normalizedPath = path || "/";
@@ -395,13 +392,37 @@ function handleInputKeyDown(e: KeyboardEvent) {
   if (e.key === "Enter") {
     e.preventDefault();
     handleSelect();
+  } else if (e.key === "Tab") {
+    e.preventDefault();
+    handleTabComplete();
   }
 }
 
+// Bash-style tab completion: complete the typed path to the longest common
+// prefix of matching directory entries. A single match completes fully.
+function handleTabComplete() {
+  const dir = displayDir.value;
+  if (!dir) return;
+  const completed = computeTabCompletion(dir.path, filterPrefix.value, dir.entries);
+  if (completed === null) return;
+  inputPath.value = completed;
+  nextTick(() => {
+    const el = inputRef.value;
+    if (!el) return;
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  });
+}
+
 function handleSelect() {
-  const { dirPath } = parseInputPath(inputPath.value);
-  const selectedPath = inputPath.value.endsWith("/") ? (dirPath === "/" ? "/" : dirPath) : dirPath;
-  emit("select", selectedPath || displayDir.value?.path || "");
+  const dir = displayDir.value;
+  const selected = resolveSelectedPath(
+    inputPath.value,
+    dir?.path || "",
+    dir?.entries || [],
+    dir?.path || "",
+  );
+  emit("select", selected);
   emit("close");
 }
 
