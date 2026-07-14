@@ -94,6 +94,8 @@ export const vi: TranslationKeys = {
   noUserCommands: "No user-defined commands found.",
   commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
   argumentHint: "Argument hint",
+  useThis: "Dùng cái này",
+  skillTag: "kỹ năng",
 
   archived: "Danh sách lưu trữ",
   noArchivedConversations: "Chưa có hội thoại được lưu trữ",

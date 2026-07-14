@@ -93,6 +93,8 @@ export interface TranslationKeys {
   noUserCommands: string;
   commandsListHint: string;
   argumentHint: string;
+  useThis: string;
+  skillTag: string;
 
   // Conversation Drawer
   archived: string;

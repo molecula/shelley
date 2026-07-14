@@ -288,9 +288,11 @@
       :conversation-id="conversationId"
       :lazy-draft-id="lazyDraftId"
       :model-options="readyModelIds"
+      :cwd="currentConversation?.cwd || selectedCwd || undefined"
       @clear-injected-text="
         diffCommentText = '';
         terminalInjectedText = null;
+        libraryInsertText = null;
       "
       @draft-change="handleDraftChange"
       @draft-send-started="handleDraftSendStarted"
@@ -461,6 +463,9 @@ const props = withDefaults(
     onTerminalClose?: (id: string) => void;
     navigateUserMessageTrigger?: number;
     onConversationUnarchived?: (conversation: Conversation) => void;
+    /** Text to insert into the composer (from the Library's "Use this"). The
+     * nonce distinguishes repeated inserts of identical text. */
+    insertComposerTrigger?: { text: string; nonce: number };
     onDraftCreated?: (conversationId: string) => void;
   }>(),
   {
@@ -589,6 +594,8 @@ const availableTools = ref<Array<{ name: string; summary: string; default_on: bo
 const showScrollToBottom = ref(false);
 const lastKnownMessageCount = ref<number | null>(null);
 const terminalInjectedText = ref<string | null>(null);
+// Text inserted into the composer from the Library's "Use this" action.
+const libraryInsertText = ref<string | null>(null);
 const terminalAutoFocusId = ref<string | null>(null);
 
 // ---- refs to DOM ----
@@ -1602,7 +1609,11 @@ function handleDraftCleared() {
 }
 
 const messageInputInjectedText = computed(
-  () => terminalInjectedText.value || diffCommentText.value || undefined,
+  () =>
+    terminalInjectedText.value ||
+    diffCommentText.value ||
+    libraryInsertText.value ||
+    undefined,
 );
 const messageInputInitialRows = computed(() =>
   props.conversationId && !props.currentConversation?.is_draft ? 1 : 3,
@@ -2030,6 +2041,15 @@ watch(
 );
 // Trigger: open terminal.
 let terminalCwd = "/";
+// Insert "Use this" text from the Library into the composer. Feeds
+// messageInputInjectedText, which MessageInput appends inline to the draft.
+watch(
+  () => props.insertComposerTrigger,
+  (trigger) => {
+    if (trigger?.text) libraryInsertText.value = trigger.text;
+  },
+);
+
 watch(
   () => props.openTerminalTrigger,
   (trigger) => {

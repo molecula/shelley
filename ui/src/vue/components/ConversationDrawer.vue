@@ -236,8 +236,12 @@
             {{ t("commands") }}
           </button>
         </div>
-        <SkillsList v-if="librarySection === 'skills'" :cwd="libraryCwd" />
-        <UserCommandsList v-else :cwd="libraryCwd" />
+        <SkillsList
+          v-if="librarySection === 'skills'"
+          :cwd="libraryCwd"
+          @use="(text) => emit('use-in-composer', text)"
+        />
+        <UserCommandsList v-else :cwd="libraryCwd" @use="(text) => emit('use-in-composer', text)" />
       </div>
       <template v-else>
       <div
@@ -374,6 +378,7 @@ const emit = defineEmits<{
   (e: "archived", id: string, next?: Conversation | null): void;
   (e: "unarchived", c: Conversation): void;
   (e: "renamed", c: Conversation): void;
+  (e: "use-in-composer", text: string): void;
 }>();
 
 const { t } = useI18n();
