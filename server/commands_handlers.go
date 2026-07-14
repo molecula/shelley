@@ -34,6 +34,10 @@ type PaletteSkill struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	IsBuiltin   bool   `json:"is_builtin"`
+	// Path is the on-disk location of the skill's SKILL.md. Empty for
+	// built-in skills (embedded in the binary). The composer uses it to build
+	// a "Use the skill X located at <path>" directive.
+	Path string `json:"path"`
 }
 
 // CommandsResponse is the payload for GET /api/commands.
@@ -73,6 +77,7 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 			Name:        sk.Name,
 			Description: sk.Description,
 			IsBuiltin:   sk.Path == "",
+			Path:        sk.Path,
 		})
 	}
 	if paletteSkills == nil {

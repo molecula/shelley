@@ -94,6 +94,8 @@ export const zhCN: TranslationKeys = {
   noUserCommands: "No user-defined commands found.",
   commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
   argumentHint: "Argument hint",
+  useThis: "使用",
+  skillTag: "技能",
 
   archived: "已归档",
   noArchivedConversations: "没有已归档的对话",

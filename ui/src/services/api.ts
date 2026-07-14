@@ -743,6 +743,7 @@ export interface SlashSkill {
   name: string;
   description: string;
   is_builtin: boolean;
+  path: string;
 }
 
 export interface SlashCommandsResponse {

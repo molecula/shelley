@@ -94,6 +94,8 @@ export const ja: TranslationKeys = {
   noUserCommands: "No user-defined commands found.",
   commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
   argumentHint: "Argument hint",
+  useThis: "これを使う",
+  skillTag: "スキル",
 
   archived: "アーカイブ済み",
   noArchivedConversations: "アーカイブされた会話はありません",

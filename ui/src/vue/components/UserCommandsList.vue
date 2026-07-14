@@ -24,7 +24,12 @@
         </button>
       </li>
     </ul>
-    <CommandViewerModal v-if="viewing" :command="viewing" @close="viewing = null" />
+    <CommandViewerModal
+      v-if="viewing"
+      :command="viewing"
+      @close="viewing = null"
+      @use="onUse"
+    />
   </template>
 </template>
 
@@ -35,12 +40,18 @@ import { useI18n } from "../composables/i18n";
 import CommandViewerModal from "./CommandViewerModal.vue";
 
 const props = defineProps<{ cwd?: string }>();
+const emit = defineEmits<{ (e: "use", text: string): void }>();
 
 const { t } = useI18n();
 const commands = ref<SlashUserCommand[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const viewing = ref<SlashUserCommand | null>(null);
+
+function onUse(text: string) {
+  emit("use", text);
+  viewing.value = null;
+}
 
 onMounted(async () => {
   try {

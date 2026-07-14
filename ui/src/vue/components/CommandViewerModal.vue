@@ -8,6 +8,11 @@
     class-name="skill-viewer-modal"
     @close="emit('close')"
   >
+    <template #title-right>
+      <button type="button" class="btn btn-primary btn-sm" @click="onUse">
+        {{ t("useThis") }}
+      </button>
+    </template>
     <p class="skill-viewer-path" :title="command.path">{{ command.path }}</p>
     <p v-if="command.description" class="command-viewer-description">
       {{ command.description }}
@@ -27,8 +32,14 @@ import MarkdownContent from "./MarkdownContent.vue";
 import type { SlashUserCommand } from "../../services/api";
 import { useI18n } from "../composables/i18n";
 
-defineProps<{ command: SlashUserCommand }>();
-const emit = defineEmits<{ (e: "close"): void }>();
+const props = defineProps<{ command: SlashUserCommand }>();
+const emit = defineEmits<{ (e: "close"): void; (e: "use", text: string): void }>();
 
 const { t } = useI18n();
+
+// Insert a short "/name" directive token into the composer; the full directive
+// text is substituted on submit (see MessageInput.expandDirectives).
+function onUse() {
+  emit("use", `/${props.command.name}`);
+}
 </script>

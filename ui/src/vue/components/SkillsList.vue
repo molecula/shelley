@@ -19,12 +19,18 @@
       <li v-for="s in skills" :key="`${s.scope}:${s.name}`">
         <button type="button" class="skills-list-item" @click="viewing = s.name">
           <span class="skills-list-name">{{ s.name }}</span>
-          <span class="skills-list-desc">{{ s.description }}</span>
+          <span class="skills-list-desc" :title="s.description">{{ truncate(s.description) }}</span>
           <span :class="`skills-list-scope skills-list-scope-${s.scope}`">{{ s.scope }}</span>
         </button>
       </li>
     </ul>
-    <SkillViewerModal v-if="viewing" :name="viewing" :cwd="cwd" @close="viewing = null" />
+    <SkillViewerModal
+      v-if="viewing"
+      :name="viewing"
+      :cwd="cwd"
+      @close="viewing = null"
+      @use="onUse"
+    />
   </template>
 </template>
 
@@ -35,12 +41,25 @@ import { useI18n } from "../composables/i18n";
 import SkillViewerModal from "./SkillViewerModal.vue";
 
 const props = defineProps<{ cwd?: string }>();
+const emit = defineEmits<{ (e: "use", text: string): void }>();
 
 const { t } = useI18n();
 const skills = ref<UserSkillSummary[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const viewing = ref<string | null>(null);
+
+function onUse(text: string) {
+  emit("use", text);
+  viewing.value = null;
+}
+
+// Truncate long skill descriptions in the list so each row stays compact; the
+// full text remains available via the element's title tooltip.
+const DESC_MAX = 100;
+function truncate(text: string): string {
+  return text.length > DESC_MAX ? `${text.slice(0, DESC_MAX).trimEnd()}…` : text;
+}
 
 onMounted(async () => {
   try {

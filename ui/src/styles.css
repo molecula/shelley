@@ -2388,6 +2388,47 @@ button {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
 }
 
+/* When directive tokens are present the textarea's own text is hidden and the
+   .composer-highlight backdrop renders the text (with coloured tokens). The
+   caret and selection stay visible. */
+.message-textarea {
+  position: relative;
+  z-index: 1;
+}
+.message-textarea.highlighting {
+  color: transparent;
+  background: transparent;
+  caret-color: var(--text-primary);
+}
+.composer-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border: 1.5px solid transparent;
+  border-radius: 4px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.composer-highlight-content {
+  padding: 0.625rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+/* Colour the token without altering text metrics: no bold, no padding, so the
+   (transparent) textarea text stays exactly the same width and the caret aligns.
+   The background tint sits behind the glyphs and doesn't affect layout. */
+.composer-token {
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 3px;
+}
+
 .message-textarea:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -2861,6 +2902,25 @@ button {
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.slash-command-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gray-200);
+  color: var(--text-secondary);
+  font-family: var(--font-sans, inherit);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.dark .slash-command-tag {
+  background: var(--gray-700);
 }
 
 .message-input-container.shell-mode .message-textarea::placeholder {

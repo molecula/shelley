@@ -41,10 +41,12 @@
         @archived="handleConversationArchived"
         @unarchived="handleConversationUnarchived"
         @renamed="handleConversationRenamed"
+        @use-in-composer="handleUseInComposer"
       />
 
       <div class="main-content">
         <ChatInterface
+          :insert-composer-trigger="composerInsert"
           :conversation-id="currentConversationId"
           :stream-status="streamStatus"
           :reconnect-nonce="reconnectNonce"
@@ -273,6 +275,15 @@ const currentConversationId = ref<string | null>(null);
 const viewedConversation = ref<Conversation | null>(null);
 const drawerOpen = ref(false);
 const drawerCollapsed = ref(false);
+// Text to insert into the composer when a Library item's "Use this" is clicked.
+// The nonce makes repeated inserts of the same text distinct so ChatInterface's
+// watcher fires each time.
+const composerInsert = ref<{ text: string; nonce: number } | undefined>(undefined);
+let composerInsertNonce = 0;
+function handleUseInComposer(text: string) {
+  composerInsert.value = { text, nonce: ++composerInsertNonce };
+  drawerOpen.value = false;
+}
 const commandPaletteOpen = ref(false);
 const diffViewerTrigger = ref(0);
 const gitGraphTrigger = ref(0);

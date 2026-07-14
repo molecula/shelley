@@ -1,16 +1,21 @@
-import { api, type SlashUserCommand } from "../services/api";
+import { api, type SlashSkill, type SlashUserCommand } from "../services/api";
 
 export interface SlashCommand {
   command: `/${string}`;
   description: string;
   takesArgs: boolean;
   // Present only for user-defined commands loaded from /api/commands. When set,
-  // selecting the command inserts the rendered body (with $ARGUMENTS handling)
-  // into the composer rather than sending `/name` verbatim. Built-ins leave
+  // selecting the command inserts a "Use the command X located at <path>"
+  // directive into the composer (see renderCommandDirective), pointing the
+  // agent at the command file rather than pasting its body. Built-ins leave
   // these undefined and keep their existing send/insert behavior.
   isUserCommand?: boolean;
-  body?: string;
-  argumentHint?: string;
+  commandPath?: string;
+  // Present only for skills loaded from /api/commands. When set, selecting the
+  // entry inserts a "Use the skill X located at <path>" directive into the
+  // composer. skillPath is empty for built-in skills (no filesystem path).
+  isSkill?: boolean;
+  skillPath?: string;
 }
 
 export const SLASH_COMMANDS = {
@@ -60,42 +65,64 @@ const BUILTIN_NAMES = new Set(
 );
 
 // toSlashCommand adapts an /api/commands user command into the SlashCommand
-// shape the composer menu already renders. A command "takes args" when its
-// body has an $ARGUMENTS placeholder or it declares an argument-hint.
+// shape the composer menu renders. Selecting it inserts a directive pointing
+// the agent at the command file (see renderCommandDirective), so it never takes
+// args in the composer.
 function toSlashCommand(c: SlashUserCommand): SlashCommand {
-  const takesArgs = c.body.includes("$ARGUMENTS") || !!c.argument_hint;
   return {
     command: `/${c.name}`,
     description: c.description || c.path,
-    takesArgs,
+    takesArgs: false,
     isUserCommand: true,
-    body: c.body,
-    argumentHint: c.argument_hint,
+    commandPath: c.path,
   };
 }
 
-// fetchUserSlashCommands loads user-defined commands from /api/commands and
-// maps them to SlashCommand entries, skipping any whose name collides with a
-// hardcoded built-in. Callers merge these alongside SLASH_COMMANDS. Failures
-// resolve to an empty list so the composer degrades to built-ins only.
+// toSkillSlashCommand adapts an /api/commands skill into a SlashCommand entry.
+// Selecting it inserts a "Use the skill …" directive (see renderSkillDirective),
+// so it never takes args and carries no body.
+function toSkillSlashCommand(s: SlashSkill): SlashCommand {
+  return {
+    command: `/${s.name}`,
+    description: s.description,
+    takesArgs: false,
+    isSkill: true,
+    skillPath: s.path,
+  };
+}
+
+// fetchUserSlashCommands loads user-defined commands AND skills from
+// /api/commands and maps them to SlashCommand entries, skipping any whose name
+// collides with a hardcoded built-in. Commands come first, skills after.
+// Callers merge these alongside SLASH_COMMANDS. Failures resolve to an empty
+// list so the composer degrades to built-ins only.
 export async function fetchUserSlashCommands(cwd?: string): Promise<SlashCommand[]> {
   try {
     const data = await api.getCommands(cwd);
-    return (data.user_commands ?? [])
+    const commands = (data.user_commands ?? [])
       .filter((c) => !BUILTIN_NAMES.has(c.name.toLowerCase()))
       .map(toSlashCommand);
+    const skills = (data.skills ?? [])
+      .filter((s) => !BUILTIN_NAMES.has(s.name.toLowerCase()))
+      .map(toSkillSlashCommand);
+    return [...commands, ...skills];
   } catch {
     return [];
   }
 }
 
-// renderUserCommand substitutes $ARGUMENTS in a command body with the given
-// arguments; if the body has no placeholder, args are appended on a new line.
-// Mirrors commands.Render on the server. Uses a function replacement so that
-// `$`-sequences inside args aren't reinterpreted by String.replace.
-export function renderUserCommand(body: string, args: string): string {
-  if (body.includes("$ARGUMENTS")) {
-    return body.replace(/\$ARGUMENTS/g, () => args);
-  }
-  return args ? `${body}\n\n${args}` : body;
+// renderUseDirective builds the text inserted into the composer when a skill or
+// command is selected. Rather than pasting the file's contents, it points the
+// agent at the file by name and path so the agent reads/activates it. Built-in
+// items have no filesystem path, so we omit the "located at" clause for them.
+function renderUseDirective(kind: "skill" | "command", name: string, path?: string): string {
+  return path ? `Use the ${kind} ${name} located at ${path}` : `Use the ${kind} ${name}`;
+}
+
+export function renderSkillDirective(name: string, path?: string): string {
+  return renderUseDirective("skill", name, path);
+}
+
+export function renderCommandDirective(name: string, path?: string): string {
+  return renderUseDirective("command", name, path);
 }

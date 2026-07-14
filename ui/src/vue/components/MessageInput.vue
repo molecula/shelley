@@ -116,7 +116,10 @@
             @mouseenter="slashMenuSelectedIndex = index"
             @click="chooseSlashCommand(index)"
           >
-            <span class="slash-command-name">{{ item.command }}</span>
+            <span class="slash-command-name">
+              {{ item.command }}
+              <span v-if="item.isSkill" class="slash-command-tag">{{ t("skillTag") }}</span>
+            </span>
             <span class="slash-command-description">{{ item.description }}</span>
           </button>
         </div>
@@ -162,17 +165,33 @@
             <line x1="12" y1="19" x2="20" y2="19" />
           </svg>
         </div>
+        <!-- Backdrop mirror that renders directive tokens in colour behind the
+             textarea (whose own text is hidden while highlighting). -->
+        <div v-if="highlightActive" class="composer-highlight" aria-hidden="true">
+          <div
+            class="composer-highlight-content"
+            :style="{ transform: `translateY(${-highlightScrollTop}px)` }"
+          ><span
+              v-for="(seg, i) in highlightSegments"
+              :key="i"
+              :class="seg.token ? 'composer-token' : undefined"
+            >{{ seg.text }}</span></div>
+        </div>
         <textarea
           ref="textareaRef"
           :value="message"
           :placeholder="placeholderText"
-          class="message-textarea"
+          :class="['message-textarea', { highlighting: highlightActive }]"
           :disabled="isDisabled"
           :rows="initialRows ?? 1"
           aria-label="Message input"
           data-testid="message-input"
           @input="onTextareaInput"
           @keydown="handleKeyDown"
+          @keyup="syncCaret"
+          @click="syncCaret"
+          @select="syncCaret"
+          @scroll="onTextareaScroll"
           @paste="handlePaste"
           @focus="onTextareaFocus"
         />
@@ -314,7 +333,8 @@ import { pickPlaceholderHint } from "../../utils/placeholderHints";
 import {
   SLASH_COMMANDS,
   fetchUserSlashCommands,
-  renderUserCommand,
+  renderCommandDirective,
+  renderSkillDirective,
   type SlashCommand,
 } from "../../utils/slashCommands";
 import { THINKING_LEVELS } from "./thinkingLevel";
@@ -403,6 +423,9 @@ const props = withDefaults(
     lazyDraftId?: string | null;
     /** Ready model ids, used to autocomplete the /model command arguments. */
     modelOptions?: string[];
+    /** Working directory of the focused conversation. Passed to the slash
+     * palette fetch so skill paths resolve against the right repo. */
+    cwd?: string;
   }>(),
   {
     showQueueOption: false,
@@ -612,6 +635,8 @@ function removeAttachment(id: string) {
 
 /** Compose final message text by appending `[path]` tokens for ready attachments. */
 function composeMessageWithAttachments(text: string): string {
+  // Expand any "/name" directive tokens into their full text before sending.
+  text = expandDirectives(text);
   if (readyAttachments.value.length === 0) return text;
   const tokens = readyAttachments.value.map((a) => `[${a.path}]`).join(" ");
   const trimmed = text.trimEnd();
@@ -713,7 +738,10 @@ watch(
         return prev + (needsNewline ? "\n\n" : "") + injected;
       });
       emit("clear-injected-text");
-      setTimeout(() => textareaRef.value?.focus(), 0);
+      setTimeout(() => {
+        textareaRef.value?.focus();
+        syncCaret();
+      }, 0);
     }
   },
 );
@@ -737,7 +765,7 @@ let userSlashLoaded = false;
 async function ensureUserSlashCommands() {
   if (userSlashLoaded) return;
   userSlashLoaded = true;
-  userSlashCommands.value = await fetchUserSlashCommands();
+  userSlashCommands.value = await fetchUserSlashCommands(props.cwd);
 }
 
 const allSlashCommands = computed<SlashCommand[]>(() => [
@@ -745,15 +773,41 @@ const allSlashCommands = computed<SlashCommand[]>(() => [
   ...userSlashCommands.value,
 ]);
 
-const slashQuery = computed(() => {
-  const match = message.value.match(/^\/[a-zA-Z0-9_-]*$/);
-  return match ? match[0].slice(1).toLowerCase() : null;
+// Caret position in the textarea, tracked reactively so the slash menu can key
+// off the token under the cursor rather than the whole input. Updated on input,
+// key, click and select events (see the textarea handlers).
+const caret = ref(0);
+function syncCaret() {
+  const ta = textareaRef.value;
+  if (ta) caret.value = ta.selectionStart ?? 0;
+}
+
+// The slash token under the caret, if any: a "/word" starting at the beginning
+// of the message or right after whitespace, ending at the caret. This lets the
+// palette trigger mid-sentence, not just when the whole input is "/query".
+const slashContext = computed(() => {
+  const uptoCaret = message.value.slice(0, caret.value);
+  const m = uptoCaret.match(/(^|\s)\/([a-zA-Z0-9_-]*)$/);
+  if (!m) return null;
+  return { query: m[2].toLowerCase(), slashStart: m.index! + m[1].length };
+});
+const slashQuery = computed(() => slashContext.value?.query ?? null);
+// Whether the slash token spans the entire message (start of input, nothing but
+// whitespace after the caret). Built-in UI commands (/fork, /diff, …) act on the
+// whole message, so they only appear in this case; skills and user commands can
+// also be inserted inline mid-sentence.
+const slashIsWholeMessage = computed(() => {
+  const ctx = slashContext.value;
+  return !!ctx && ctx.slashStart === 0 && message.value.slice(caret.value).trim() === "";
 });
 const slashSuggestions = computed(() => {
   if (slashQuery.value === null) return [];
-  return allSlashCommands.value.filter((item) =>
-    item.command.slice(1).toLowerCase().startsWith(slashQuery.value!),
-  );
+  const wholeMessage = slashIsWholeMessage.value;
+  return allSlashCommands.value.filter((item) => {
+    if (!item.command.slice(1).toLowerCase().startsWith(slashQuery.value!)) return false;
+    const isBuiltin = !item.isSkill && !item.isUserCommand;
+    return isBuiltin ? wholeMessage : true;
+  });
 });
 const exactSlashCommand = computed(() =>
   slashSuggestions.value.some((item) => item.command.slice(1) === slashQuery.value),
@@ -767,6 +821,67 @@ const showSlashMenu = computed(
     !isDisabled.value &&
     !isShellMode.value,
 );
+
+// --- directive tokens (colored while typing, expanded on submit) ---------
+// A selected skill/command is inserted into the composer as a short "/name"
+// token rendered in colour via a backdrop overlay. The full directive text is
+// only substituted when the message is sent (see expandDirectives), so the
+// composer stays compact while typing. Matching is stateless — any "/name" that
+// resolves to a known skill/user command is a token — so it survives drafts.
+const TOKEN_RE = /(^|\s)\/([a-zA-Z0-9_-]+)/g;
+
+function lookupDirective(name: string): SlashCommand | undefined {
+  const lower = name.toLowerCase();
+  return userSlashCommands.value.find(
+    (c) => (c.isSkill || c.isUserCommand) && c.command.slice(1).toLowerCase() === lower,
+  );
+}
+
+function directiveText(item: SlashCommand): string {
+  const name = item.command.slice(1);
+  return item.isSkill
+    ? renderSkillDirective(name, item.skillPath)
+    : renderCommandDirective(name, item.commandPath);
+}
+
+// Split the message into plain runs and colored token runs for the backdrop.
+const highlightSegments = computed(() => {
+  const text = message.value;
+  const segments: Array<{ text: string; token: boolean }> = [];
+  let last = 0;
+  TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TOKEN_RE.exec(text)) !== null) {
+    const name = m[2];
+    if (!lookupDirective(name)) continue;
+    const slashIdx = m.index + m[1].length;
+    if (slashIdx > last) segments.push({ text: text.slice(last, slashIdx), token: false });
+    segments.push({ text: `/${name}`, token: true });
+    last = slashIdx + 1 + name.length;
+  }
+  if (last < text.length) segments.push({ text: text.slice(last), token: false });
+  return segments;
+});
+
+// Only overlay (and hide the textarea's own text) when there's a token to show
+// and we're not in shell mode, so ordinary typing is untouched.
+const highlightActive = computed(
+  () => !isShellMode.value && highlightSegments.value.some((s) => s.token),
+);
+
+const highlightScrollTop = ref(0);
+function onTextareaScroll() {
+  highlightScrollTop.value = textareaRef.value?.scrollTop ?? 0;
+}
+
+// Replace every "/name" token that resolves to a skill/command with its full
+// directive. Called on the outgoing text only (drafts keep the short tokens).
+function expandDirectives(text: string): string {
+  return text.replace(TOKEN_RE, (whole, pre: string, name: string) => {
+    const item = lookupDirective(name);
+    return item ? pre + directiveText(item) : whole;
+  });
+}
 
 // --- /model argument autocomplete ---------------------------------------
 // Once "/model " has been typed, offer the ready model ids plus the reasoning
@@ -859,6 +974,20 @@ watch(slashQuery, (q) => {
   if (q !== null) void ensureUserSlashCommands();
 });
 
+// Un-dismiss the menu whenever the slash token under the caret changes at all —
+// a new "/" started, the caret moved to another token, or the query text was
+// edited (typing or backspacing). Keying off the token identity (position+query),
+// rather than only clearing on an empty message, lets the menu reappear for a
+// fresh mid-sentence "/" and re-open as you backspace into an existing token,
+// while a dismissal still sticks until the next edit. Model-arg dismissal is
+// unaffected: slashContext is null throughout "/model " args, so this never fires.
+watch(
+  () => (slashContext.value ? `${slashContext.value.slashStart}:${slashContext.value.query}` : null),
+  (cur, prev) => {
+    if (cur !== prev) slashMenuDismissed.value = false;
+  },
+);
+
 watch(message, (value) => {
   if (value.length === 0) slashMenuDismissed.value = false;
   if (value === SLASH_COMMANDS.SHELL.command) {
@@ -870,20 +999,26 @@ watch(message, (value) => {
 async function chooseSlashCommand(index: number) {
   const item = slashSuggestions.value[index];
   if (!item) return;
-  // User-defined commands aren't UI actions: expand the command body into the
-  // composer (substituting $ARGUMENTS / appending args) so the user can edit
-  // and send it as a normal message. The server doesn't expand `/name` itself.
-  if (item.isUserCommand) {
-    const rendered = renderUserCommand(item.body ?? "", "");
-    setMessage(rendered);
+  // Skills and user commands aren't UI actions: insert a short "/name" token
+  // (rendered in colour via the backdrop overlay) rather than the full directive.
+  // The directive text is only substituted on submit (see expandDirectives), so
+  // the composer stays compact while typing. Only the slash token under the caret
+  // is replaced, so it works mid-sentence, preserving surrounding text.
+  if (item.isSkill || item.isUserCommand) {
+    const token = `${item.command} `;
+    const start = slashContext.value?.slashStart ?? 0;
+    const before = message.value.slice(0, start);
+    const after = message.value.slice(caret.value);
+    setMessage(before + token + after);
     slashMenuDismissed.value = true;
+    const pos = (before + token).length;
     requestAnimationFrame(() => {
       const ta = textareaRef.value;
       if (!ta) return;
       ta.focus();
-      // Place the caret at the end so the user can keep typing arguments.
-      const end = ta.value.length;
-      ta.setSelectionRange(end, end);
+      // Place the caret right after the inserted token (past the trailing space).
+      ta.setSelectionRange(pos, pos);
+      caret.value = pos;
     });
     return;
   }
@@ -993,6 +1128,7 @@ async function handleSendNow() {
 
 function onTextareaInput(e: Event) {
   setMessage((e.target as HTMLTextAreaElement).value);
+  syncCaret();
 }
 
 function onTextareaFocus() {
@@ -1118,6 +1254,9 @@ onMounted(() => {
     window.visualViewport.addEventListener("resize", handleViewportResize);
   }
   void nextTick(adjustTextareaHeight);
+  // Load skills/commands up front so directive tokens colour and expand even in
+  // a restored draft the user never re-triggered the palette for.
+  void ensureUserSlashCommands();
 });
 
 onUnmounted(() => {

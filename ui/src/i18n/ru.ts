@@ -94,6 +94,8 @@ export const ru: TranslationKeys = {
   noUserCommands: "No user-defined commands found.",
   commandsListHint: "Drop a markdown file into ~/.claude/commands/ or .claude/commands/.",
   argumentHint: "Argument hint",
+  useThis: "Использовать",
+  skillTag: "навык",
 
   archived: "Архив",
   noArchivedConversations: "Нет архивных диалогов",
