@@ -11,6 +11,28 @@ export interface TranslationKeys {
   moreOptions: string;
   conversations: string;
 
+  // Scheduled Tasks
+  scheduledTasks: string;
+  createTaskHint: string;
+  newTask: string;
+  noScheduledTasks: string;
+  noScheduledTasksHint: string;
+  schedulingUnavailable: string;
+  schedulingUnavailableHint: string;
+  deleteTask: string;
+  confirmDeleteTask: string;
+  taskActive: string;
+  taskInactive: string;
+  taskCompleted: string;
+  taskSchedule: string;
+  taskNextRun: string;
+  taskLastRun: string;
+  taskCwd: string;
+  taskPrompt: string;
+  taskRuns: string;
+  noTaskRuns: string;
+  openRunConversation: string;
+
   // Overflow Menu
   diffs: string;
   gitGraph: string;

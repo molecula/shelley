@@ -32,25 +32,40 @@
   <div :class="`drawer ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`">
     <!-- Header -->
     <div class="drawer-header">
-      <div class="drawer-mode-tabs" role="tablist">
+      <div class="drawer-nav-menu" role="tablist">
         <button
           role="tab"
-          :aria-selected="drawerMode === 'conversations' && !showArchived"
-          :class="`drawer-mode-tab${drawerMode === 'conversations' && !showArchived ? ' active' : ''}`"
+          :aria-selected="drawerMode === 'conversations' && mainView !== 'scheduled'"
+          :class="`drawer-nav-item${drawerMode === 'conversations' && mainView !== 'scheduled' ? ' active' : ''}`"
           @click="
             setDrawerMode('conversations');
             showArchived = false;
+            emit('select-view', 'chat');
           "
         >
-          {{ showArchived ? t("archived") : t("conversations") }}
+          <i class="pi pi-comments drawer-nav-icon" aria-hidden="true" />
+          <span>{{ showArchived ? t("archived") : t("conversations") }}</span>
         </button>
         <button
           role="tab"
-          :aria-selected="drawerMode === 'library'"
-          :class="`drawer-mode-tab${drawerMode === 'library' ? ' active' : ''}`"
-          @click="setDrawerMode('library')"
+          :aria-selected="drawerMode === 'library' && mainView !== 'scheduled'"
+          :class="`drawer-nav-item${drawerMode === 'library' && mainView !== 'scheduled' ? ' active' : ''}`"
+          @click="
+            setDrawerMode('library');
+            emit('select-view', 'chat');
+          "
         >
-          {{ t("library") }}
+          <i class="pi pi-book drawer-nav-icon" aria-hidden="true" />
+          <span>{{ t("library") }}</span>
+        </button>
+        <button
+          role="tab"
+          :aria-selected="mainView === 'scheduled'"
+          :class="`drawer-nav-item${mainView === 'scheduled' ? ' active' : ''}`"
+          @click="emit('select-view', 'scheduled')"
+        >
+          <i class="pi pi-clock drawer-nav-icon" aria-hidden="true" />
+          <span>{{ t("scheduledTasks") }}</span>
         </button>
       </div>
       <div class="drawer-header-actions">
@@ -244,76 +259,76 @@
         <UserCommandsList v-else :cwd="libraryCwd" @use="(text) => emit('use-in-composer', text)" />
       </div>
       <template v-else>
-      <div
-        v-if="isSearching && searching && searchResults === null"
-        class="text-secondary drawer-empty-state"
-      >
-        <p>{{ t("searching") }}</p>
-      </div>
-      <div
-        v-else-if="loadingArchived && showArchived && !isSearching"
-        class="text-secondary drawer-empty-state"
-      >
-        <p>{{ t("loading") }}</p>
-      </div>
-      <div
-        v-else-if="displayedConversations.length === 0"
-        class="text-secondary drawer-empty-state"
-      >
-        <p>
-          {{
-            isSearching
-              ? t("noSearchResults")
-              : showArchived
-                ? t("noArchivedConversations")
-                : t("noConversationsYet")
-          }}
-        </p>
-        <p v-if="!showArchived && !isSearching" class="text-sm drawer-empty-state-hint">
-          {{ t("startNewToGetStarted") }}
-        </p>
-      </div>
-      <div v-else-if="groupedConversations" class="conversation-list">
-        <div v-for="[key, group] in groupedConversations" :key="key" class="conversation-group">
-          <button class="conversation-group-header" @click="toggleGroup(key)">
-            <svg
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              class="conversation-group-chevron"
-              :style="{ transform: collapsedGroups.has(key) ? 'rotate(-90deg)' : 'rotate(0deg)' }"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                :stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-            <span
-              class="conversation-group-label"
-              :title="key === '__ungrouped__' ? undefined : key"
-            >
-              {{ group.label }}
-            </span>
-            <span class="conversation-group-count">{{ group.conversations.length }}</span>
-          </button>
-          <template v-if="!collapsedGroups.has(key)">
-            <ConversationRow
-              v-for="conv in group.conversations"
-              :key="conv.conversation_id"
-              :conversation="conv"
-            />
-          </template>
+        <div
+          v-if="isSearching && searching && searchResults === null"
+          class="text-secondary drawer-empty-state"
+        >
+          <p>{{ t("searching") }}</p>
         </div>
-      </div>
-      <div v-else class="conversation-list">
-        <ConversationRow
-          v-for="conv in displayedConversations"
-          :key="conv.conversation_id"
-          :conversation="conv"
-        />
-      </div>
+        <div
+          v-else-if="loadingArchived && showArchived && !isSearching"
+          class="text-secondary drawer-empty-state"
+        >
+          <p>{{ t("loading") }}</p>
+        </div>
+        <div
+          v-else-if="displayedConversations.length === 0"
+          class="text-secondary drawer-empty-state"
+        >
+          <p>
+            {{
+              isSearching
+                ? t("noSearchResults")
+                : showArchived
+                  ? t("noArchivedConversations")
+                  : t("noConversationsYet")
+            }}
+          </p>
+          <p v-if="!showArchived && !isSearching" class="text-sm drawer-empty-state-hint">
+            {{ t("startNewToGetStarted") }}
+          </p>
+        </div>
+        <div v-else-if="groupedConversations" class="conversation-list">
+          <div v-for="[key, group] in groupedConversations" :key="key" class="conversation-group">
+            <button class="conversation-group-header" @click="toggleGroup(key)">
+              <svg
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                class="conversation-group-chevron"
+                :style="{ transform: collapsedGroups.has(key) ? 'rotate(-90deg)' : 'rotate(0deg)' }"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  :stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+              <span
+                class="conversation-group-label"
+                :title="key === '__ungrouped__' ? undefined : key"
+              >
+                {{ group.label }}
+              </span>
+              <span class="conversation-group-count">{{ group.conversations.length }}</span>
+            </button>
+            <template v-if="!collapsedGroups.has(key)">
+              <ConversationRow
+                v-for="conv in group.conversations"
+                :key="conv.conversation_id"
+                :conversation="conv"
+              />
+            </template>
+          </div>
+        </div>
+        <div v-else class="conversation-list">
+          <ConversationRow
+            v-for="conv in displayedConversations"
+            :key="conv.conversation_id"
+            :conversation="conv"
+          />
+        </div>
       </template>
     </div>
 
@@ -368,6 +383,9 @@ const props = defineProps<{
   currentConversationId: string | null;
   viewedConversation?: Conversation | null;
   showActiveTrigger?: number;
+  // Which view owns the main content pane. "scheduled" means the Scheduled
+  // Tasks view has taken over from the chat window.
+  mainView?: "chat" | "scheduled";
 }>();
 
 const emit = defineEmits<{
@@ -379,6 +397,8 @@ const emit = defineEmits<{
   (e: "unarchived", c: Conversation): void;
   (e: "renamed", c: Conversation): void;
   (e: "use-in-composer", text: string): void;
+  // Switch which view owns the main content pane.
+  (e: "select-view", view: "chat" | "scheduled"): void;
 }>();
 
 const { t } = useI18n();

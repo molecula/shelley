@@ -535,6 +535,11 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/user-skills", http.HandlerFunc(s.handleUserSkills))
 	mux.Handle("GET /api/user-skills/{name}", http.HandlerFunc(s.handleUserSkillContent))
 
+	// Scheduled tasks API (systemd user timers created by the /schedule skill)
+	mux.Handle("GET /api/scheduled-tasks", http.HandlerFunc(s.handleScheduledTasks))
+	mux.Handle("GET /api/scheduled-tasks/{name}/runs", http.HandlerFunc(s.handleScheduledTaskRuns))
+	mux.Handle("DELETE /api/scheduled-tasks/{name}", http.HandlerFunc(s.handleDeleteScheduledTask))
+
 	// Version endpoints
 	mux.Handle("GET /version", http.HandlerFunc(s.handleVersion))
 	mux.Handle("GET /version-check", http.HandlerFunc(s.handleVersionCheck))

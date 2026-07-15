@@ -13,7 +13,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // DefaultSocketPath returns the default Unix socket path (~/.config/shelley/shelley.sock).
@@ -167,6 +169,7 @@ func cmdChat(cc *clientConfig, args []string) {
 	model := fs.String("model", "", "Model to use (server default if empty)")
 	cwd := fs.String("cwd", "", "Working directory for the conversation")
 	ephemeral := fs.Bool("ephemeral", false, "Wait for end of turn, then archive the conversation (for cron-style cleanup)")
+	scheduleName := fs.String("schedule-name", "", "Record this run against the named scheduled task (used by the /schedule skill)")
 	fs.Parse(args)
 
 	if *prompt == "" {
@@ -254,6 +257,14 @@ func cmdChat(cc *clientConfig, args []string) {
 
 	json.NewEncoder(os.Stdout).Encode(output)
 
+	// When invoked by a scheduled task, append a run record so the Scheduled
+	// Tasks UI can list past runs and link to the conversation each one created.
+	if *scheduleName != "" {
+		cidStr, _ := cid.(string)
+		slugStr, _ := output["slug"].(string)
+		recordScheduledRun(*scheduleName, cidStr, slugStr)
+	}
+
 	if *ephemeral {
 		cidStr, ok := cid.(string)
 		if !ok || cidStr == "" {
@@ -263,6 +274,53 @@ func cmdChat(cc *clientConfig, args []string) {
 		waitForEndOfTurn(cc, client, baseURL, cidStr)
 		archiveConversation(cc, client, baseURL, cidStr)
 	}
+}
+
+// scheduledTaskNameRE mirrors the server's guard: run records are only written
+// for shelley-prefixed task names, so a bad -schedule-name can't escape the
+// runs directory.
+var scheduledTaskNameRE = regexp.MustCompile(`^shelley-[A-Za-z0-9_-]+$`)
+
+// recordScheduledRun appends a JSONL record of this run to
+// ~/.config/shelley/runs/<name>.jsonl. Best-effort: failures are reported to
+// stderr but never fail the run.
+func recordScheduledRun(name, conversationID, slug string) {
+	if !scheduledTaskNameRE.MatchString(name) {
+		fmt.Fprintf(os.Stderr, "Warning: invalid -schedule-name %q; not recording run\n", name)
+		return
+	}
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not record run: %v\n", err)
+			return
+		}
+		configDir = filepath.Join(home, ".config")
+	}
+	dir := filepath.Join(configDir, "shelley", "runs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not create runs dir: %v\n", err)
+		return
+	}
+	// Field names match the server's ScheduledRunAPI JSON tags so the same
+	// shape is read back and served to the UI unchanged.
+	record := map[string]string{
+		"ts":             time.Now().Format(time.RFC3339),
+		"conversationId": conversationID,
+		"slug":           slug,
+	}
+	line, err := json.Marshal(record)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, name+".jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not open runs file: %v\n", err)
+		return
+	}
+	defer f.Close()
+	f.Write(append(line, '\n'))
 }
 
 // waitForEndOfTurn streams the conversation until the agent's turn ends.

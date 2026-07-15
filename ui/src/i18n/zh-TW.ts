@@ -243,8 +243,7 @@ export const zhTW: TranslationKeys = {
   // Welcome / Empty State
   welcomeTitle: "Shelley Agent",
   welcomeSubtitle: "",
-  welcomeMessage:
-    "Shelley 是一個運行在 {hostname} 上的代理。你可以讓 Shelley 幫你完成各種任務。",
+  welcomeMessage: "Shelley 是一個運行在 {hostname} 上的代理。你可以讓 Shelley 幫你完成各種任務。",
   sendMessageToStart: "傳送訊息以開始對話。",
   noModelsConfiguredHint: "未設定 AI 模型。按 Ctrl+K 或 ⌘+K 新增模型。",
 
@@ -272,4 +271,26 @@ export const zhTW: TranslationKeys = {
   simplifiedChinese: "简体中文",
   traditionalChinese: "繁體中文",
   vietnamese: "Tiếng Việt",
+
+  // Scheduled Tasks (fall back to en until translated)
+  scheduledTasks: "",
+  createTaskHint: "",
+  newTask: "",
+  noScheduledTasks: "",
+  noScheduledTasksHint: "",
+  schedulingUnavailable: "",
+  schedulingUnavailableHint: "",
+  deleteTask: "",
+  confirmDeleteTask: "",
+  taskActive: "",
+  taskInactive: "",
+  taskCompleted: "",
+  taskSchedule: "",
+  taskNextRun: "",
+  taskLastRun: "",
+  taskCwd: "",
+  taskPrompt: "",
+  taskRuns: "",
+  noTaskRuns: "",
+  openRunConversation: "",
 };

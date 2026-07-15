@@ -34,6 +34,7 @@
         :current-conversation-id="currentConversationId"
         :viewed-conversation="viewedConversation"
         :show-active-trigger="showActiveTrigger"
+        :main-view="mainView"
         @close="drawerOpen = false"
         @toggle-collapse="toggleDrawerCollapsed"
         @select-conversation="selectConversation"
@@ -42,10 +43,19 @@
         @unarchived="handleConversationUnarchived"
         @renamed="handleConversationRenamed"
         @use-in-composer="handleUseInComposer"
+        @select-view="handleSelectView"
       />
 
       <div class="main-content">
+        <ScheduledTasksView
+          v-if="mainView === 'scheduled'"
+          :on-open-drawer="() => (drawerOpen = true)"
+          :is-drawer-collapsed="drawerCollapsed"
+          :on-toggle-drawer-collapse="toggleDrawerCollapsed"
+          @open-conversation="handleOpenRunConversation"
+        />
         <ChatInterface
+          v-else
           :insert-composer-trigger="composerInsert"
           :conversation-id="currentConversationId"
           :stream-status="streamStatus"
@@ -190,6 +200,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import ConversationDrawer from "./components/ConversationDrawer.vue";
+import ScheduledTasksView from "./components/ScheduledTasksView.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import ModelsModal from "./components/ModelsModal.vue";
 import NotificationsModal from "./components/NotificationsModal.vue";
@@ -282,6 +293,27 @@ const composerInsert = ref<{ text: string; nonce: number } | undefined>(undefine
 let composerInsertNonce = 0;
 function handleUseInComposer(text: string) {
   composerInsert.value = { text, nonce: ++composerInsertNonce };
+  drawerOpen.value = false;
+}
+
+// Which view owns the main content pane: the chat window, or the Scheduled
+// Tasks list. Persisted like the drawer prefs.
+const mainView = ref<"chat" | "scheduled">(
+  localStorage.getItem("shelley-main-view") === "scheduled" ? "scheduled" : "chat",
+);
+function handleSelectView(view: "chat" | "scheduled") {
+  mainView.value = view;
+  localStorage.setItem("shelley-main-view", view);
+}
+// Open the conversation a scheduled run created: switch back to the chat view
+// and load it by id (updating the URL when we know its slug).
+function handleOpenRunConversation(conversationId: string, slug: string) {
+  handleSelectView("chat");
+  const conv = conversations.value.find((c) => c.conversation_id === conversationId);
+  currentConversationId.value = conversationId;
+  viewedConversation.value = conv ?? null;
+  const targetSlug = slug || conv?.slug;
+  window.history.replaceState({}, "", targetSlug ? `/c/${targetSlug}` : `/c/${conversationId}`);
   drawerOpen.value = false;
 }
 const commandPaletteOpen = ref(false);

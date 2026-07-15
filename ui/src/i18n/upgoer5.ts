@@ -244,8 +244,7 @@ export const upgoer5: TranslationKeys = {
   // Welcome / Empty State
   welcomeTitle: "Your Helper",
   welcomeSubtitle: "",
-  welcomeMessage:
-    "This is a helper, running on {hostname}. You can ask it to do stuff.",
+  welcomeMessage: "This is a helper, running on {hostname}. You can ask it to do stuff.",
   sendMessageToStart: "Send a note to start talking.",
   noModelsConfiguredHint: "No brains set up yet. You need to add one to get started.",
 
@@ -273,4 +272,26 @@ export const upgoer5: TranslationKeys = {
   simplifiedChinese: "简体中文",
   traditionalChinese: "繁體中文",
   vietnamese: "Tiếng Việt",
+
+  // Scheduled Tasks (fall back to en until translated)
+  scheduledTasks: "",
+  createTaskHint: "",
+  newTask: "",
+  noScheduledTasks: "",
+  noScheduledTasksHint: "",
+  schedulingUnavailable: "",
+  schedulingUnavailableHint: "",
+  deleteTask: "",
+  confirmDeleteTask: "",
+  taskActive: "",
+  taskInactive: "",
+  taskCompleted: "",
+  taskSchedule: "",
+  taskNextRun: "",
+  taskLastRun: "",
+  taskCwd: "",
+  taskPrompt: "",
+  taskRuns: "",
+  noTaskRuns: "",
+  openRunConversation: "",
 };

@@ -708,6 +708,41 @@ class ApiService {
     return response.json();
   }
 
+  // getScheduledTasks lists the recurring tasks created by the /schedule
+  // skill (systemd user timers). platformSupported is false where systemd is
+  // unavailable (e.g. macOS), in which case tasks is empty.
+  async getScheduledTasks(): Promise<ScheduledTasksResponse> {
+    const response = await fetch(`${this.baseUrl}/scheduled-tasks`);
+    if (!response.ok) {
+      throw new Error(`Failed to load scheduled tasks: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  // getScheduledTaskRuns lists past runs of a task (newest first). Each run is
+  // a conversation the task spawned; empty if the task has never run or
+  // predates run recording.
+  async getScheduledTaskRuns(name: string): Promise<ScheduledRun[]> {
+    const response = await fetch(
+      `${this.baseUrl}/scheduled-tasks/${encodeURIComponent(name)}/runs`,
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to load task runs: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  // deleteScheduledTask disables and removes the systemd units for a task.
+  async deleteScheduledTask(name: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/scheduled-tasks/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+      headers: { "X-Shelley-Request": "1" },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete scheduled task: ${response.statusText}`);
+    }
+  }
+
   // getHostIcon fetches the LLM-generated SVG icon for this host from
   // /api/host-icon. Returns the raw SVG markup, or null when the server
   // has none yet (404) or the request otherwise fails.
@@ -765,6 +800,33 @@ export interface UserSkillContent {
   description: string;
   path: string;
   content: string;
+}
+
+// ScheduledTask mirrors a shelley-<name>.{timer,service} systemd unit pair
+// created by the /schedule skill.
+export type ScheduledTaskStatus = "active" | "completed" | "inactive";
+
+export interface ScheduledTask {
+  name: string;
+  schedule: string; // raw systemd OnCalendar expression
+  scheduleLabel: string; // human-legible rendering of schedule
+  prompt: string;
+  cwd: string;
+  nextRun: string;
+  lastRun: string;
+  status: ScheduledTaskStatus;
+}
+
+export interface ScheduledTasksResponse {
+  platformSupported: boolean;
+  tasks: ScheduledTask[];
+}
+
+// One recorded run of a scheduled task — the conversation that firing spawned.
+export interface ScheduledRun {
+  ts: string;
+  conversationId: string;
+  slug: string;
 }
 
 // Feature flags API. Flags are declared in Go (package featureflags); the

@@ -245,8 +245,7 @@ export const en: TranslationKeys = {
   // Welcome / Empty State
   welcomeTitle: "Shelley Agent",
   welcomeSubtitle: "",
-  welcomeMessage:
-    "Shelley is an agent, running on {hostname}. You can ask Shelley to do stuff.",
+  welcomeMessage: "Shelley is an agent, running on {hostname}. You can ask Shelley to do stuff.",
   sendMessageToStart: "Send a message to start the conversation.",
   noModelsConfiguredHint: "No AI models configured. Press Ctrl+K or ⌘+K to add a model.",
 
@@ -260,6 +259,29 @@ export const en: TranslationKeys = {
 
   openConversations: "Open conversations",
   expandSidebar: "Expand sidebar",
+
+  // Scheduled Tasks
+  scheduledTasks: "Scheduled Tasks",
+  createTaskHint: "Use /schedule in any conversation to create a new scheduled task.",
+  newTask: "New task",
+  noScheduledTasks: "No scheduled tasks",
+  noScheduledTasksHint: "Create one with the /schedule skill in chat, or click “New task”.",
+  schedulingUnavailable: "Scheduling isn’t available on this platform",
+  schedulingUnavailableHint:
+    "Scheduled tasks use systemd user timers, which are only available on Linux.",
+  deleteTask: "Delete task",
+  confirmDeleteTask: "Delete this scheduled task?",
+  taskActive: "Active",
+  taskInactive: "Inactive",
+  taskCompleted: "Completed",
+  taskSchedule: "Schedule",
+  taskNextRun: "Next run",
+  taskLastRun: "Last run",
+  taskCwd: "Directory",
+  taskPrompt: "Prompt",
+  taskRuns: "Runs",
+  noTaskRuns: "No runs recorded yet.",
+  openRunConversation: "Open the conversation this run created",
 
   // Language
   language: "Language",

@@ -243,8 +243,7 @@ export const ja: TranslationKeys = {
   // Welcome / Empty State
   welcomeTitle: "Shelley Agent",
   welcomeSubtitle: "",
-  welcomeMessage:
-    "Shelleyは{hostname}で動作するエージェントです。Shelleyに作業を依頼できます。",
+  welcomeMessage: "Shelleyは{hostname}で動作するエージェントです。Shelleyに作業を依頼できます。",
   sendMessageToStart: "メッセージを送信して会話を開始してください。",
   noModelsConfiguredHint:
     "AIモデルが設定されていません。Ctrl+K または ⌘+K でモデルを追加してください。",
@@ -273,4 +272,26 @@ export const ja: TranslationKeys = {
   simplifiedChinese: "简体中文",
   traditionalChinese: "繁體中文",
   vietnamese: "Tiếng Việt",
+
+  // Scheduled Tasks (fall back to en until translated)
+  scheduledTasks: "",
+  createTaskHint: "",
+  newTask: "",
+  noScheduledTasks: "",
+  noScheduledTasksHint: "",
+  schedulingUnavailable: "",
+  schedulingUnavailableHint: "",
+  deleteTask: "",
+  confirmDeleteTask: "",
+  taskActive: "",
+  taskInactive: "",
+  taskCompleted: "",
+  taskSchedule: "",
+  taskNextRun: "",
+  taskLastRun: "",
+  taskCwd: "",
+  taskPrompt: "",
+  taskRuns: "",
+  noTaskRuns: "",
+  openRunConversation: "",
 };
