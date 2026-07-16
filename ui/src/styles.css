@@ -2415,6 +2415,11 @@ button {
   font-family: inherit;
   font-size: 1rem;
   line-height: 1.6;
+  /* The <textarea> renders with letter-spacing: normal (form controls don't
+     inherit the body's -0.01em), so the mirror must too — otherwise every glyph
+     packs ~0.16px tighter here than in the textarea and the caret drifts right,
+     compounding across the line and down each wrapped row. */
+  letter-spacing: normal;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: break-word;
