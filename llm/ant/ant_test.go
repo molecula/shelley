@@ -784,18 +784,18 @@ func TestMaxOutputTokensCapping(t *testing.T) {
 		t.Errorf("Opus 4.6: MaxTokens = %d, want 100000", got2.MaxTokens)
 	}
 
-	// Sonnet 4.6 has a 64k limit — 50000 should pass through
+	// Sonnet 4.6 has a 128k limit — 50000 should pass through
 	s3 := &Service{Model: Claude46Sonnet, MaxTokens: 50000}
 	got3 := s3.fromLLMRequest(simpleReq)
 	if got3.MaxTokens != 50000 {
 		t.Errorf("Sonnet 4.6: MaxTokens = %d, want 50000", got3.MaxTokens)
 	}
 
-	// Sonnet 4.6 with MaxTokens above 64k must be capped
+	// Sonnet 4.6 with MaxTokens above 128k must be capped
 	s4 := &Service{Model: Claude46Sonnet, MaxTokens: 200000}
 	got4 := s4.fromLLMRequest(simpleReq)
-	if got4.MaxTokens != 64000 {
-		t.Errorf("Sonnet 4.6 capped: MaxTokens = %d, want 64000", got4.MaxTokens)
+	if got4.MaxTokens != 128000 {
+		t.Errorf("Sonnet 4.6 capped: MaxTokens = %d, want 128000", got4.MaxTokens)
 	}
 }
 
@@ -835,6 +835,10 @@ func TestMaxOutputTokensMatchModelsDevAPI(t *testing.T) {
 		Claude45Opus,
 		Claude46Opus,
 		Claude46Sonnet,
+		Claude47Opus,
+		Claude48Opus,
+		Claude5Sonnet,
+		ClaudeFable5,
 	} {
 		apiModel, ok := anthropic.Models[model]
 		if !ok {
@@ -2787,6 +2791,16 @@ func TestUseAdaptiveThinking(t *testing.T) {
 		{"anthropic.claude-sonnet-4-5-20250929-v1:0", false},
 		{"claude-opus-4-80", false},
 		{"anthropic.claude-opus-4-85-v1:0", false},
+		{Claude5Sonnet, true},
+		{"claude-opus-5", true},
+		{"claude-opus-5-20260801", true},
+		{"us.anthropic.claude-opus-5-v1:0", true},
+		{"claude-haiku-5", true},
+		{"claude-sonnet-5-5", true},
+		{"claude-fable-6", true},
+		{"claude-3-5-sonnet-20241022", false},
+		{Claude45Haiku, false},
+		{"opus-5-totally-other-vendor", false},
 	}
 	for _, tt := range tests {
 		if got := useAdaptiveThinking(tt.model); got != tt.want {

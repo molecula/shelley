@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,8 +46,8 @@ var modelMaxOutputTokens = map[string]int{
 	Claude47Opus:   128000,
 	Claude46Opus:   128000,
 	Claude45Opus:   128000,
-	Claude5Sonnet:  64000,
-	Claude46Sonnet: 64000,
+	Claude5Sonnet:  128000,
+	Claude46Sonnet: 128000,
 	Claude45Sonnet: 64000,
 	Claude4Sonnet:  64000,
 	Claude45Haiku:  64000,
@@ -114,10 +115,10 @@ func (s *Service) maxOutputTokens() int {
 		model = DefaultModel
 	}
 	switch model {
-	case ClaudeFable5, Claude48Opus, Claude47Opus, Claude46Opus:
+	case ClaudeFable5, Claude48Opus, Claude47Opus, Claude46Opus,
+		Claude46Sonnet, Claude5Sonnet:
 		return 128000
-	case Claude4Sonnet, Claude45Sonnet, Claude46Sonnet, Claude5Sonnet,
-		Claude45Haiku, Claude45Opus:
+	case Claude4Sonnet, Claude45Sonnet, Claude45Haiku, Claude45Opus:
 		return 64000
 	default:
 		return 64000
@@ -291,16 +292,32 @@ type systemContent struct {
 // useAdaptiveThinking reports whether the model requires adaptive thinking
 // (thinking: {type: "adaptive"} + output_config: {effort: "..."}) instead of
 // the legacy manual thinking (thinking: {type: "enabled", budget_tokens: N}).
-// Claude Opus 4.7 and later require adaptive thinking.
-// Matching is done on '-'/'.'-delimited tokens so it covers dated snapshots
-// ("claude-opus-4-8-20260115") and provider-qualified names
-// ("us.anthropic.claude-opus-4-8-v1:0") without false positives like
-// "claude-opus-4-80".
+// Claude Opus 4.7 and later require adaptive thinking, as do all Claude
+// generation-5+ models. Matching is done on non-alphanumeric-delimited tokens
+// so it covers dated snapshots ("claude-opus-5-20260801") and
+// provider-qualified names ("us.anthropic.claude-opus-5-v1:0") without false
+// positives like "claude-opus-4-80".
 func useAdaptiveThinking(model string) bool {
-	model = "-" + strings.ReplaceAll(model, ".", "-") + "-"
-	for _, m := range []string{ClaudeFable5, Claude5Sonnet, Claude48Opus, Claude47Opus} {
-		if strings.Contains(model, "-"+m+"-") {
+	norm := "-" + strings.ReplaceAll(strings.ReplaceAll(model, ".", "-"), ":", "-") + "-"
+	for _, m := range []string{Claude48Opus, Claude47Opus} {
+		if strings.Contains(norm, "-"+m+"-") {
 			return true
+		}
+	}
+	if !strings.Contains(norm, "-claude-") {
+		return false
+	}
+	toks := strings.FieldsFunc(strings.ToLower(model), func(r rune) bool {
+		return !(('a' <= r && r <= 'z') || ('0' <= r && r <= '9'))
+	})
+	for i, t := range toks {
+		switch t {
+		case "opus", "sonnet", "haiku", "fable":
+			if i+1 < len(toks) {
+				if v, err := strconv.Atoi(toks[i+1]); err == nil && v >= 5 && v < 1000 {
+					return true
+				}
+			}
 		}
 	}
 	return false
