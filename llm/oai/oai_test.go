@@ -2008,3 +2008,61 @@ func TestServiceReasoningEffort(t *testing.T) {
 		})
 	}
 }
+
+// TestServiceServiceTier verifies that Service.ServiceTier is sent as the
+// `service_tier` field on chat-completions requests, and that an empty
+// ServiceTier keeps the field off the wire (omitempty).
+func TestServiceServiceTier(t *testing.T) {
+	tests := []struct {
+		name        string
+		svcTier     string
+		wantTier    string
+		wantPresent bool
+	}{
+		{name: "priority tier sent", svcTier: "priority", wantTier: "priority", wantPresent: true},
+		{name: "empty tier omitted", svcTier: "", wantTier: "", wantPresent: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotTier string
+			var gotPresent bool
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]json.RawMessage
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatalf("decode: %v", err)
+				}
+				raw, ok := body["service_tier"]
+				gotPresent = ok
+				if ok {
+					if err := json.Unmarshal(raw, &gotTier); err != nil {
+						t.Fatalf("unmarshal service_tier: %v", err)
+					}
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{{Message: openai.ChatCompletionMessage{Role: "assistant", Content: "ok"}, FinishReason: "stop"}},
+				})
+			}))
+			defer server.Close()
+
+			svc := &Service{
+				APIKey:      "k",
+				Model:       GPT41,
+				ModelURL:    server.URL + "/v1",
+				ServiceTier: tt.svcTier,
+			}
+			_, err := svc.Do(context.Background(), &llm.Request{
+				Messages: []llm.Message{{Role: llm.MessageRoleUser, Content: []llm.Content{{Type: llm.ContentTypeText, Text: "hi"}}}},
+			})
+			if err != nil {
+				t.Fatalf("Do: %v", err)
+			}
+			if gotPresent != tt.wantPresent {
+				t.Errorf("service_tier present = %v, want %v", gotPresent, tt.wantPresent)
+			}
+			if gotTier != tt.wantTier {
+				t.Errorf("service_tier = %q, want %q", gotTier, tt.wantTier)
+			}
+		})
+	}
+}

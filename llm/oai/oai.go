@@ -531,6 +531,10 @@ type Service struct {
 	// value (used by custom-model config to pass provider-specific values like
 	// "xhigh" or "none"). Overridden by Request.ThinkingLevel when set.
 	ReasoningEffort string
+	// ServiceTier, when non-empty, is sent as the literal `service_tier`
+	// value on chat-completions requests (e.g. "priority" for Fireworks/
+	// OpenAI priority routing). Provider-specific; no validation here.
+	ServiceTier string
 }
 
 var _ llm.Service = (*Service)(nil)
@@ -1251,6 +1255,9 @@ func (s *Service) Do(ctx context.Context, ir *llm.Request) (*llm.Response, error
 			req.ReasoningEffort = "high"
 		}
 	}
+	if s.ServiceTier != "" {
+		req.ServiceTier = openai.ServiceTier(s.ServiceTier)
+	}
 	// Construct the full URL for logging and debugging
 	fullURL := baseURL + "/chat/completions"
 
@@ -1383,11 +1390,15 @@ func (s *Service) UseSimplifiedPatch() bool {
 func (s *Service) ConfigDetails() map[string]string {
 	model := cmp.Or(s.Model, DefaultModel)
 	baseURL := cmp.Or(s.ModelURL, model.URL, OpenAIURL)
-	return map[string]string{
+	details := map[string]string{
 		"base_url":        baseURL,
 		"model_name":      model.ModelName,
 		"full_url":        baseURL + "/chat/completions",
 		"api_key_env":     model.APIKeyEnv,
 		"has_api_key_set": fmt.Sprintf("%v", s.APIKey != ""),
 	}
+	if s.ServiceTier != "" {
+		details["service_tier"] = s.ServiceTier
+	}
+	return details
 }

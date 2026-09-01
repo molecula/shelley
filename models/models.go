@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -705,6 +706,7 @@ func (m *Manager) createServiceFromModel(model *generated.Model) llm.Service {
 			},
 			HTTPC:        m.httpc,
 			ProviderName: "openai",
+			ServiceTier:  serviceTierFromTags(model.Tags),
 		}
 	case "openai-responses":
 		return &oai.ResponsesService{
@@ -755,4 +757,15 @@ func ResolveSupportsImages(endpoint, modelName, imageSupport string) bool {
 	default:
 		return true
 	}
+}
+
+// serviceTierFromTags extracts the value of a "service-tier:<v>" tag
+// from a comma-separated tag list; "" when absent.
+func serviceTierFromTags(tags string) string {
+	for _, t := range strings.Split(tags, ",") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(t), "service-tier:"); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

@@ -384,3 +384,21 @@ func TestPreferredToolModelsAreRegistered(t *testing.T) {
 }
 
 func (m *mockLLMService) SupportsImages() bool { return true }
+
+func TestServiceTierFromTags(t *testing.T) {
+	tests := []struct {
+		tags string
+		want string
+	}{
+		{tags: "service-tier:priority", want: "priority"},
+		{tags: "slug, service-tier:priority", want: "priority"},
+		{tags: "slug", want: ""},
+		{tags: "", want: ""},
+		{tags: " service-tier: priority ", want: "priority"},
+	}
+	for _, tt := range tests {
+		if got := serviceTierFromTags(tt.tags); got != tt.want {
+			t.Errorf("serviceTierFromTags(%q) = %q, want %q", tt.tags, got, tt.want)
+		}
+	}
+}
