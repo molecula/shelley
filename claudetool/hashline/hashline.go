@@ -1,7 +1,7 @@
 // Package hashline provides line-addressable file editing using hash-anchored references.
 //
 // Each line is identified by its 1-indexed line number and a short hash derived from
-// the normalized line text (CRC32, truncated to 2 chars from a custom alphabet).
+// the normalized line text (CRC32, reduced to 3 chars from a custom alphabet).
 // The combined LINE#HASH reference acts as both an address and a staleness check.
 package hashline
 
@@ -113,7 +113,7 @@ func isSignificant(line string) bool {
 	return false
 }
 
-// ComputeLineHash returns a 2-character hash for a line.
+// ComputeLineHash returns a 3-character hash for a line.
 // For lines with no alphanumeric content, the line number is mixed in as seed
 // to reduce collisions among }, {, blank lines, etc.
 func ComputeLineHash(lineNum int, line string) string {
@@ -132,7 +132,7 @@ func ComputeLineHash(lineNum int, line string) string {
 	return string([]byte{alphabet[a], alphabet[b], alphabet[c]})
 }
 
-// FormatLineTag returns "42#VP" for the given line number and text.
+// FormatLineTag returns a tag such as "42#VPq" for the given line number and text.
 func FormatLineTag(lineNum int, text string) string {
 	return fmt.Sprintf("%d#%s", lineNum, ComputeLineHash(lineNum, text))
 }
@@ -153,11 +153,11 @@ func FormatHashLines(text string, startLine int) string {
 
 var tagRegex = regexp.MustCompile(`^\s*[>+-]*\s*(\d+)\s*#\s*([0-9A-Za-z]{3})`)
 
-// ParseTag parses a tag string like "42#VP" into an Anchor.
+// ParseTag parses a tag string like "42#VPq" into an Anchor.
 func ParseTag(ref string) (Anchor, error) {
 	m := tagRegex.FindStringSubmatch(ref)
 	if m == nil {
-		return Anchor{}, fmt.Errorf("invalid line reference %q, expected format \"LINE#ID\" (e.g. \"5#ZZ\")", ref)
+		return Anchor{}, fmt.Errorf("invalid line reference %q, expected format \"LINE#ID\" (e.g. \"5#ZZq\")", ref)
 	}
 	line, _ := strconv.Atoi(m[1]) // regex guarantees digits
 	if line < 1 {

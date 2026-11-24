@@ -2,7 +2,6 @@ package hashline
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -16,7 +15,8 @@ type Edit struct {
 }
 
 // ApplyEdits validates all anchors and applies edits to file content.
-// Edits are applied bottom-up so line-number shifts don't affect earlier edits.
+// Every anchor refers to the original file. Edits that touch the same lines
+// are rejected rather than applied in an order the caller cannot predict.
 func ApplyEdits(text string, edits []Edit) (string, error) {
 	if len(edits) == 0 {
 		return text, nil
@@ -108,65 +108,80 @@ func ApplyEdits(text string, edits []Edit) (string, error) {
 	}
 	edits = expanded
 
-	// Compute sort key for bottom-up application.
-	type annotated struct {
-		edit       Edit
-		sortLine   int
-		precedence int // lower = applied first at same line
+	// Index every edit by the original line it is anchored to. Nothing is
+	// mutated in place: the output is rebuilt in one pass over the original
+	// lines, so no edit can shift the line numbers another edit relies on.
+	n := len(fileLines)
+	ranges := make(map[int]lineRange) // start line -> range
+	ends := make(map[int]bool)        // ends[L]: a range ends at line L
+	covered := make([]bool, n+2)      // covered[L]: line L is inside a replace_range
+	before := make(map[int][]string)  // lines inserted immediately before line L
+	after := make(map[int][]string)   // lines inserted immediately after line L
+	var prependFile, appendFile []string
+
+	for _, e := range edits {
+		if e.Op != "replace_range" {
+			continue
+		}
+		for l := e.Pos.Line; l <= e.End.Line; l++ {
+			if covered[l] {
+				return "", fmt.Errorf("conflicting edits: line %d is replaced or moved by more than one edit; combine them into a single range", l)
+			}
+			covered[l] = true
+		}
+		ranges[e.Pos.Line] = lineRange{end: e.End.Line, content: e.Content}
+		ends[e.End.Line] = true
 	}
-	anns := make([]annotated, len(edits))
-	for i, e := range edits {
-		var sortLine, prec int
+
+	for _, e := range edits {
 		switch e.Op {
-		case "replace_range":
-			sortLine = e.End.Line
-			prec = 0
 		case "append_at":
-			sortLine = e.Pos.Line
-			prec = 1
+			// The gap after line L is inside a range when both L and L+1 are covered.
+			if covered[e.Pos.Line] && covered[e.Pos.Line+1] && !ends[e.Pos.Line] {
+				return "", fmt.Errorf("conflicting edits: cannot insert after line %d because it is inside a range that is replaced or moved; anchor the insert at the end of that range instead", e.Pos.Line)
+			}
+			after[e.Pos.Line] = append(after[e.Pos.Line], e.Content...)
 		case "prepend_at":
-			sortLine = e.Pos.Line
-			prec = 2
+			if _, starts := ranges[e.Pos.Line]; covered[e.Pos.Line] && !starts {
+				return "", fmt.Errorf("conflicting edits: cannot insert before line %d because it is inside a range that is replaced or moved; anchor the insert at the start of that range instead", e.Pos.Line)
+			}
+			before[e.Pos.Line] = append(before[e.Pos.Line], e.Content...)
 		case "append_file":
-			sortLine = len(fileLines) + 1
-			prec = 1
+			appendFile = append(appendFile, e.Content...)
 		case "prepend_file":
-			sortLine = 0
-			prec = 2
-		}
-		anns[i] = annotated{edit: e, sortLine: sortLine, precedence: prec}
-	}
-
-	slices.SortStableFunc(anns, func(a, b annotated) int {
-		if a.sortLine != b.sortLine {
-			return b.sortLine - a.sortLine // descending
-		}
-		return a.precedence - b.precedence
-	})
-
-	// Apply bottom-up.
-	for _, ann := range anns {
-		e := ann.edit
-		lines := e.Content
-		if lines == nil {
-			lines = []string{} // delete = replace with nothing
-		}
-
-		switch e.Op {
-		case "replace_range":
-			start := e.Pos.Line - 1 // 0-indexed
-			count := e.End.Line - e.Pos.Line + 1
-			fileLines = slices.Replace(fileLines, start, start+count, lines...)
-		case "append_at":
-			fileLines = slices.Insert(fileLines, e.Pos.Line, lines...)
-		case "prepend_at":
-			fileLines = slices.Insert(fileLines, e.Pos.Line-1, lines...)
-		case "append_file":
-			fileLines = append(fileLines, lines...)
-		case "prepend_file":
-			fileLines = slices.Insert(fileLines, 0, lines...)
+			prependFile = append(prependFile, e.Content...)
 		}
 	}
 
-	return strings.Join(fileLines, "\n"), nil
+	// A file that ends in a newline splits into a final empty element. Content
+	// appended to the file belongs just before that element, after anything
+	// inserted before it, so the file keeps its single trailing newline
+	// instead of gaining a blank line and losing it.
+	endsWithNewline := n > 1 && fileLines[n-1] == "" && !covered[n]
+
+	out := make([]string, 0, n+len(prependFile)+len(appendFile))
+	out = append(out, prependFile...)
+	for l := 1; l <= n; l++ {
+		out = append(out, before[l]...)
+		if l == n && endsWithNewline {
+			out = append(out, appendFile...)
+			appendFile = nil
+		}
+		if r, ok := ranges[l]; ok {
+			out = append(out, r.content...)
+			l = r.end
+		} else {
+			out = append(out, fileLines[l-1])
+		}
+		out = append(out, after[l]...)
+	}
+	out = append(out, appendFile...)
+
+	return strings.Join(out, "\n"), nil
+}
+
+// lineRange is a replace_range keyed by its start line.
+type lineRange struct {
+	end     int
+	content []string
 }
